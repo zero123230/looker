@@ -1,0 +1,99 @@
+- view: interviews
+  sql_table_name: employees_interviews
+  fields:
+
+  - dimension: confirmed
+    type: yesno
+    sql: ${TABLE}.confirmed
+
+  - dimension: company_uid
+    type: int
+    hidden: true
+    sql: ${TABLE}.eid
+
+  - dimension: iid
+    type: int
+    primary_key: true
+    sql: ${TABLE}.iid
+
+  - dimension: nid
+    type: int
+    sql: ${TABLE}.nid
+
+  - dimension_group: reminder_same_day_sent
+    type: time
+    timeframes: [time, date, week, month, year]
+    sql: (CASE WHEN ${TABLE}.reminder_same_day_sent > 0 THEN FROM_UNIXTIME(${TABLE}.reminder_same_day_sent) ELSE NULL END)
+
+  - dimension_group: reminder_sent
+    type: time
+    timeframes: [time, date, week, month, year]
+    sql: (CASE WHEN ${TABLE}.reminder_sent > 0 THEN FROM_UNIXTIME(${TABLE}.reminder_sent) ELSE NULL END)
+
+  - dimension_group: reminder_sent_one_day_before_1
+    type: time
+    timeframes: [time, date, week, month, year]
+    sql: (CASE WHEN ${TABLE}.reminder_sent_one_day_before_1 > 0 THEN FROM_UNIXTIME(${TABLE}.reminder_sent_one_day_before_1) ELSE NULL END)
+
+  - dimension_group: reminder_sent_one_day_before_2
+    type: time
+    timeframes: [time, date, week, month, year]
+    sql: (CASE WHEN ${TABLE}.reminder_sent_one_day_before_2 > 0 THEN FROM_UNIXTIME(${TABLE}.reminder_sent_one_day_before_2) ELSE NULL END)
+
+  - dimension_group: reminder_sent_same_day
+    type: time
+    timeframes: [time, date, week, month, year]
+    sql: (CASE WHEN ${TABLE}.reminder_sent_same_day > 0 THEN FROM_UNIXTIME(${TABLE}.reminder_sent_same_day) ELSE NULL END)
+
+  - dimension_group: reminder_sent_two_days_before
+    type: time
+    timeframes: [time, date, week, month, year]
+    sql: (CASE WHEN ${TABLE}.reminder_sent_two_days_before > 0 THEN FROM_UNIXTIME(${TABLE}.reminder_sent_two_days_before) ELSE NULL END)
+
+  - dimension_group: sent_date
+    type: time
+    timeframes: [time, date, week, month, year]
+    sql: FROM_UNIXTIME(${TABLE}.sent_date)
+
+  - dimension: uid
+    type: int
+    sql: ${TABLE}.uid
+    
+  - dimension: is_from_mobile_app
+    type: yesno
+    sql: |
+      (SELECT CASE WHEN COUNT(ea.id) > 0 THEN 0 ELSE 1 END
+      FROM employees_activity ea
+      WHERE ea.uid = ${uid} AND ea.nid = ${nid} AND ea.activity_id = 1)
+
+  - dimension_group: interview_date
+    type: time
+    timeframes: [time, date, week, month, year]
+    sql: FROM_UNIXTIME(${TABLE}.value)
+
+  - measure: count
+    type: count
+    detail: detail*
+  
+  - measure: unique_count
+    type: count_distinct
+    sql: ${TABLE}.uid
+    detail: detail*
+  
+  - measure: unique_interviews_confirmed
+    type: count_distinct
+    sql: ${TABLE}.uid
+    filters:
+      confirmed: yes
+    
+  - measure: interviews_confirmed
+    type: count_distinct
+    sql: CONCAT(${uid}, ${nid})
+    filters:
+      confirmed: yes
+
+  # ----- Detail ------
+  sets:
+    detail:
+
+
