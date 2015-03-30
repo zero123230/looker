@@ -1,0 +1,95 @@
+- view: ranked
+
+  derived_table:
+    sql_trigger_value: SELECT FLOOR((UNIX_TIMESTAMP(CONVERT_TZ(NOW(),'UTC','America/Sao_Paulo')) - 60*60*5)/(60*60*24))
+    indexes: [nid, uid]
+    sql: |
+      SELECT CONCAT(tmp.uid, tmp.nid) AS uid_nid, tmp.nid, tmp.uid, tmp.score, tmp.rank,
+      CASE WHEN mabt.algorithm IS NULL THEN 'old' ELSE mabt.algorithm END AS algorithm,
+      COUNT(
+        DISTINCT CASE WHEN (ea.activity_id = 1) THEN CONCAT(ea.uid, ea.nid) ELSE NULL END
+      ) AS candidates_contacted,
+      COUNT(
+        DISTINCT CASE WHEN (ea.activity_id = 9) THEN CONCAT(ea.uid, ea.nid) ELSE NULL END
+      ) AS candidates_requested_salary_info,
+      COUNT(
+        DISTINCT CASE WHEN (eia.activity_id IN (1,10)) THEN CONCAT(eia.uid, eia.nid) ELSE NULL END
+      ) AS candidates_attended,
+      COUNT(
+        DISTINCT CASE WHEN ei.confirmed THEN CONCAT(ei.uid, ei.nid) ELSE NULL END
+      ) AS interviews_confirmed
+      FROM (
+        SELECT nid, uid, score, 
+          @rank := IF(@current_nid = nid, @rank + 1, 1) AS rank,
+          @current_nid := nid
+        FROM employees_matches_storage
+        ORDER BY nid, score DESC
+      ) AS tmp
+      LEFT JOIN employees_activity ea ON tmp.uid = ea.uid AND tmp.nid = ea.nid
+      LEFT JOIN employees_interviews ei ON tmp.uid = ei.uid AND tmp.nid = ei.nid
+      LEFT JOIN employees_internal_activity eia ON tmp.uid = eia.uid AND tmp.nid = eia.nid
+      LEFT JOIN matching_ab_tests mabt ON tmp.uid = mabt.candidate_id AND tmp.nid = mabt.job_id
+      GROUP BY uid_nid
+      ORDER BY tmp.rank
+
+  fields:
+
+    - dimension: algorithm
+      sql: ${TABLE}.algorithm
+
+    - dimension: uid
+      type: int
+      sql: ${TABLE}.uid
+      
+    - dimension: nid
+      type: int
+      sql: ${TABLE}.nid
+      
+    - dimension: rank
+      type: int
+      sql: ${TABLE}.rank
+      
+    - dimension: score
+      type: number
+      decimals: 2
+      sql: ${TABLE}.score
+    
+    - dimension: rank_tier
+      type: tier
+      tiers: [1, 501, 1001, 1501, 2001, 2501, 3001, 3501, 4001, 4501, 5001]
+      style: integer
+      sql: ${rank}
+      
+    - dimension: candidates_contacted
+      type: int
+      sql: ${TABLE}.candidates_contacted
+      
+    - dimension: candidates_requested_salary_info
+      type: int
+      sql: ${TABLE}.candidates_requested_salary_info
+      
+    - dimension: candidates_attended
+      type: int
+      sql: ${TABLE}.candidates_attended
+      
+    - dimension: interviews_confirmed
+      type: int
+      sql: ${TABLE}.interviews_confirmed
+
+    - measure: candidates_contacted_sum
+      type: sum
+      sql: ${candidates_contacted}
+      
+    - measure: candidates_requested_salary_info_sum
+      type: sum
+      sql: ${candidates_requested_salary_info}
+      
+    - measure: candidates_attended_sum
+      type: sum
+      sql: ${candidates_attended}
+      
+    - measure: interviews_confirmed_sum
+      type: sum
+      sql: ${interviews_confirmed}
+
+
