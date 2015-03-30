@@ -1,0 +1,426 @@
+- view: candidate_activity_facts
+  derived_table:
+    sql_trigger_value: SELECT FLOOR((UNIX_TIMESTAMP(CONVERT_TZ(NOW(),'UTC','America/Sao_Paulo')) - 60*60*5)/(60*60*24))
+    indexes: [uid]
+    sql: |
+      SELECT
+        ea.uid
+        , MIN(
+            CASE
+              WHEN ea.activity_id = 1 AND ea.type = 'pre_interview'
+              THEN ea.date
+              ELSE NULL
+            END
+        ) AS first_contacted
+        , SUM(
+            CASE
+              WHEN ea.activity_id = 1 AND ea.type = 'pre_interview'
+              THEN 1
+              ELSE NULL
+            END
+        ) AS lifetime_contacted
+        , MIN(
+            CASE
+              WHEN ea.activity_id = 9 AND ea.type = 'pre_interview'
+              THEN ea.date
+              ELSE NULL
+            END
+        ) AS first_interested
+        , MAX(
+            CASE
+              WHEN ea.activity_id = 9 AND ea.type = 'pre_interview'
+              THEN ea.date
+              ELSE NULL
+            END
+        ) AS last_interested
+        , SUM(
+            CASE
+              WHEN ea.activity_id = 9 AND ea.type = 'pre_interview'
+              THEN 1
+              ELSE NULL
+            END
+        ) AS lifetime_interested
+        , MIN(
+            CASE
+              WHEN ea.activity_id = 3 AND ea.type = 'pre_interview'
+              THEN ea.date
+              ELSE NULL
+            END
+        ) AS first_scheduled_for_interview
+        , SUM(
+            CASE
+              WHEN ea.activity_id = 3 AND ea.type = 'pre_interview'
+              THEN 1
+              ELSE NULL
+            END
+        ) AS lifetime_scheduled_for_interview
+        , MIN(
+            CASE
+              WHEN ea.type = 'attended_interview'
+              THEN ea.date
+              ELSE NULL
+            END
+        ) AS first_confirmed_interview
+        , MAX(
+            CASE
+              WHEN ea.type = 'attended_interview'
+              THEN ea.date
+              ELSE NULL
+            END
+        ) AS last_confirmed_interview
+        , SUM(
+            CASE
+              WHEN ea.type = 'attended_interview'
+              THEN 1
+              ELSE NULL
+            END
+        ) AS lifetime_confirmed_interviews
+        , MIN(
+            CASE
+              WHEN ea.type = 'attended_interview' AND ea.is_mobile = 1
+              THEN ea.date
+              ELSE NULL
+            END
+        ) AS first_mobile_confirmed_interview
+        , SUM(
+            CASE
+              WHEN ea.type = 'attended_interview' AND ea.is_mobile = 1
+              THEN 1
+              ELSE NULL
+            END
+        ) AS lifetime_mobile_confirmed_interviews
+        , MIN(
+            CASE
+              WHEN ea.type = 'attended_interview' AND ea.is_mobile = 0
+              THEN ea.date
+              ELSE NULL
+            END
+        ) AS first_sms_confirmed_interview
+        , SUM(
+            CASE
+              WHEN ea.type = 'attended_interview' AND ea.is_mobile = 0
+              THEN 1
+              ELSE NULL
+            END
+        ) AS lifetime_sms_confirmed_interviews
+        , MIN(
+            CASE
+              WHEN ea.activity_id = 1 AND ea.type = 'post_interview'
+              THEN ea.date
+              ELSE NULL
+            END
+        ) AS first_attended_interview
+        , MAX(
+            CASE
+              WHEN ea.activity_id = 1 AND ea.type = 'post_interview'
+              THEN ea.date
+              ELSE NULL
+            END
+        ) AS last_attended_interview
+        , SUM(
+            CASE
+              WHEN ea.activity_id = 1 AND ea.type = 'post_interview'
+              THEN 1
+              ELSE NULL
+            END
+        ) AS lifetime_attended_interview
+        , MIN(
+            CASE
+              WHEN ea.activity_id = 5 AND ea.type = 'pre_interview'
+              THEN ea.date
+              ELSE NULL
+            END
+        ) AS first_pre_interview_hired
+        , SUM(
+            CASE
+              WHEN ea.activity_id = 5 AND ea.type = 'pre_interview'
+              THEN 1
+              ELSE NULL
+            END
+        ) AS lifetime_pre_interview_hired
+        , MIN(
+            CASE
+              WHEN ea.activity_id = 10 AND ea.type = 'post_interview'
+              THEN ea.date
+              ELSE NULL
+            END
+        ) AS first_hired
+        , SUM(
+            CASE
+              WHEN ea.activity_id = 10 AND ea.type = 'post_interview'
+              THEN 1
+              ELSE NULL
+            END
+        ) AS lifetime_hired
+      FROM (
+        SELECT
+          a1.id AS id
+          , 'pre_interview' AS type
+          , a1.date AS date
+          , a1.uid AS uid
+          , a1.nid AS nid
+          , a1.activity_id AS activity_id
+          , NULL AS is_mobile
+        FROM employees_activity AS a1
+        UNION
+        SELECT
+          a2.id AS id
+          , 'post_interview' AS type
+          , a2.date AS date
+          , a2.uid AS uid
+          , a2.nid AS nid
+          , a2.activity_id AS activity_id
+          , NULL AS is_mobile
+        FROM employees_internal_activity AS a2
+        UNION
+        SELECT
+          a3.iid AS id
+          , 'attended_interview' AS type
+          , a3.value AS date
+          , a3.uid AS uid
+          , a3.nid AS nid
+          , NULL AS activity_id
+          , CASE WHEN ea3.id IS NULL THEN 1 ELSE 0 END AS is_mobile
+        FROM employees_interviews AS a3
+        LEFT JOIN employees_activity ea3 ON a3.uid = ea3.uid AND a3.nid = ea3.nid AND ea3.activity_id = 1
+        WHERE a3.confirmed = 1
+      ) AS ea
+      GROUP BY 1
+
+  fields:
+  - dimension: uid
+    primary_key: true
+    type: int
+  
+  - dimension_group: first_contacted
+    type: time
+    timeframes: [yesno, date, week, month]
+    sql: FROM_UNIXTIME(${TABLE}.first_contacted)
+    
+  - dimension_group: last_interested
+    type: time
+    timeframes: [yesno, date, week, month]
+    sql: FROM_UNIXTIME(${TABLE}.last_interested)
+
+  - dimension: months_til_first_contacted
+    type: number
+    sql: FLOOR(DATEDIFF(${first_contacted_date}, ${candidates.created_date})/30)
+
+  - measure: contacted_count
+    type: count
+    filters:
+      first_contacted: yes
+
+  - measure: contacted_running_total
+    type: running_total
+    sql: ${contacted_count}
+
+  - measure: percent_contacted
+    type: number
+    decimals: 2
+    sql: 100.0 * ${contacted_count}/NULLIF(${candidates.count},0)
+  
+  - dimension_group: first_interested
+    type: time
+    timeframes: [yesno, date, week, month]
+    sql: FROM_UNIXTIME(${TABLE}.first_interested)
+
+  - dimension: months_til_first_interested
+    type: number
+    decimals: 0
+    sql: FLOOR(DATEDIFF(${first_interested_date}, ${candidates.created_date})/30)
+
+  - measure: interested_count
+    type: count
+    filters:
+      first_interested: yes
+
+  - measure: interested__running_total
+    type: running_total
+    sql: ${interested_count}
+
+  - measure: percent_interested
+    type: number
+    decimals: 2
+    sql: 100.0 * ${interested_count}/NULLIF(${candidates.count},0)
+
+  - dimension_group: first_scheduled_for_interview
+    type: time
+    timeframes: [yesno, date, week, month]
+    sql: FROM_UNIXTIME(${TABLE}.first_scheduled_for_interview)
+
+  - dimension: months_til_scheduled_for_interview
+    type: number
+    decimals: 0
+    sql: FLOOR(DATEDIFF(${first_scheduled_for_interview_date}, ${candidates.created_date})/30)
+
+  - measure: scheduled_for_interview_count
+    type: count
+    filters:
+      first_scheduled_for_interview: yes
+
+  - measure: scheduled_for_interview_running_total
+    type: running_total
+    sql: ${scheduled_for_interview_count}
+
+  - measure: percent_scheduled_for_interview
+    type: number
+    decimals: 2
+    sql: 100.0 * ${scheduled_for_interview_count}/NULLIF(${candidates.count},0)
+
+  - dimension_group: first_confirmed_interview
+    type: time
+    timeframes: [yesno, date, week, month]
+    sql: FROM_UNIXTIME(${TABLE}.first_confirmed_interview)
+    
+  - dimension_group: last_confirmed_interview
+    type: time
+    timeframes: [yesno, date, week, month]
+    sql: FROM_UNIXTIME(${TABLE}.last_confirmed_interview)
+    
+  - dimension_group: first_confirmed_mobile_interview
+    type: time
+    timeframes: [yesno, date, week, month]
+    sql: FROM_UNIXTIME(${TABLE}.first_mobile_confirmed_interview)
+    
+  - dimension_group: first_confirmed_sms_interview
+    type: time
+    timeframes: [yesno, date, week, month]
+    sql: FROM_UNIXTIME(${TABLE}.first_sms_confirmed_interview)
+
+  - dimension: months_til_confirmed_interview
+    type: number
+    decimals: 0
+    sql: FLOOR(DATEDIFF(${first_confirmed_interview_date}, ${candidates.created_date})/30)
+
+  - measure: confirmed_interviews_count
+    type: count
+    filters:
+      first_confirmed_interview: yes
+  
+  - measure: confirmed_mobile_interviews_count
+    type: count
+    filters:
+      first_confirmed_mobile_interview: yes
+      
+  - measure: confirmed_sms_interviews_count
+    type: count
+    filters:
+      first_confirmed_sms_interview: yes
+      
+  - measure: confirmed_interviews_lifetime_sum
+    type: sum
+    sql: ${TABLE}.lifetime_confirmed_interviews
+    filters: 
+      first_confirmed_interview: yes
+
+  - measure: confirmed_mobile_interviews_lifetime_sum
+    type: sum
+    sql: ${TABLE}.lifetime_mobile_confirmed_interviews
+    filters: 
+      first_confirmed_mobile_interview: yes
+      
+  - measure: confirmed_sms_interviews_lifetime_sum
+    type: sum
+    sql: ${TABLE}.lifetime_sms_confirmed_interviews
+    filters: 
+      first_confirmed_sms_interview: yes
+
+  - measure: confirmed_interviews_running_total
+    type: running_total
+    sql: ${confirmed_interviews_count}
+
+  - measure: percent_confirmed_interviews
+    type: number
+    decimals: 2
+    sql: 100.0 * ${confirmed_interviews_count}/NULLIF(${candidates.count},0)
+
+  - dimension_group: first_attended_interview
+    type: time
+    timeframes: [yesno, date, week, month]
+    sql: FROM_UNIXTIME(${TABLE}.first_attended_interview)
+    
+  - dimension_group: last_attended_interview
+    type: time
+    timeframes: [yesno, date, week, month]
+    sql: FROM_UNIXTIME(${TABLE}.last_attended_interview)
+    
+  - measure: attended_interview_lifetime_sum
+    type: sum
+    sql: ${TABLE}.lifetime_attended_interview
+    filters: 
+      first_attended_interview: yes
+
+  - dimension: months_til_attended_interview
+    type: number
+    decimals: 0
+    sql: FLOOR(DATEDIFF(${first_attended_interview_date}, ${candidates.created_date})/30)
+
+  - measure: attended_interview_count
+    type: count
+    filters:
+      first_attended_interview: yes
+
+  - measure: attended_interview_running_total
+    type: running_total
+    sql: ${attended_interview_count}
+
+  - measure: percent_attended_interview
+    type: number
+    decimals: 2
+    sql: 100.0 * ${attended_interview_count}/NULLIF(${candidates.count},0)
+
+  - dimension_group: first_pre_interview_hired
+    type: time
+    timeframes: [yesno, date, week, month]
+    sql: FROM_UNIXTIME(${TABLE}.first_pre_interview_hired)
+
+  - dimension: months_til_first_pre_interview_hired
+    type: number
+    decimals: 0
+    sql: FLOOR(DATEDIFF(${first_pre_interview_hired_date}, ${candidates.created_date})/30)
+
+  - measure: pre_interview_hired_count
+    type: count
+    filters:
+      first_pre_interview_hired: yes
+      
+  - measure: pre_interview_hired_running_total
+    type: running_total
+    sql: ${pre_interview_hired_count}
+
+  - measure: percent_pre_interview_hired
+    type: number
+    decimals: 2
+    sql: 100.0 * ${pre_interview_hired_count}/NULLIF(${candidates.count},0)
+    
+  - dimension_group: first_hired
+    type: time
+    timeframes: [yesno, date, week, month]
+    sql: FROM_UNIXTIME(${TABLE}.first_hired)
+
+  - dimension: months_til_first_hired
+    type: number
+    decimals: 0
+    sql: FLOOR(DATEDIFF(${first_hired_date}, ${candidates.created_date})/30)
+
+  - measure: hired_count
+    type: count
+    filters:
+      first_hired: yes
+      
+  - measure: hired_running_total
+    type: running_total
+    sql: ${hired_count}
+
+  - measure: percent_hired
+    type: number
+    decimals: 2
+    sql: 100.0 * ${hired_count}/NULLIF(${candidates.count},0)
+    
+    
+    
+    
+    
+    
+    
