@@ -1,0 +1,185 @@
+- connection: emprego_ligado 
+
+- scoping: true                  # for backward compatibility
+- include: "*.view.lookml"       # include all the views
+- include: "*.dashboard.lookml"  # include all the dashboards
+- template: liquid
+
+- base_view: candidates_activity_conversion
+  joins:
+    - join: candidates
+      foreign_key: uid
+    
+    - join: jobs
+      foreign_key: nid
+
+- base_view: candidates_activity
+#   conditionally_filter:
+#     candidates_activity.activity_date: 30 days
+#     unless:
+#       - candidates_activity.activity_week
+#       - candidates_activity.activity_month
+#       - candidates_activity.activity_year
+  persist_for: 20 hours
+  joins:
+    - join: candidates_activity_labels
+      foreign_key: activity_id
+  
+    - join: candidates
+      foreign_key: uid
+      
+    - join: candidates_monthly_facts
+      foreign_key: candidates.created_month_key
+      
+    - join: candidate_activity_facts
+      foreign_key: candidates.uid
+    
+    - join: jobs
+      foreign_key: nid
+          
+    - join: jobs_categories_facts
+      foreign_key: jobs.category
+      
+    - join: companies
+      foreign_key: jobs.company_uid
+      
+#     - join: geo_regions
+#       from: tbl_cep
+#       foreign_key: candidates.cep
+
+
+- base_view: recruitment_activities
+  joins:
+    - join: recruitment_activities_label
+      sql_on: |
+        recruitment_activities_label.activity_id = recruitment_activities.activity_id AND
+        recruitment_activities_label.type = recruitment_activities.type
+  
+    - join: candidates
+      foreign_key: uid
+      
+    - join: candidates_monthly_facts
+      foreign_key: candidates.created_month_key
+    
+    - join: jobs
+      foreign_key: nid
+          
+    - join: jobs_categories_facts
+      foreign_key: jobs.category
+      
+    - join: companies
+      foreign_key: jobs.company_uid
+      
+    - join: interviews
+      sql_on: |
+        recruitment_activities.nid = interviews.nid AND
+        recruitment_activities.uid = interviews.uid
+        
+    - join: matching_ab_tests
+      sql_on: |
+        matching_ab_tests.job_id = recruitment_activities.nid AND
+        matching_ab_tests.candidate_id = recruitment_activities.uid
+        
+    - join: matches_storage
+      sql_on: |
+        recruitment_activities.nid = matches_storage.nid AND
+        recruitment_activities.uid = matches_storage.uid
+        
+    - join: ranked_matches
+      sql_on: |
+        ranked_matches.nid = recruitment_activities.nid AND
+        ranked_matches.uid = recruitment_activities.uid
+
+
+- base_view: candidates_internal_activity
+  joins:
+    - join: candidates_internal_activity_labels
+      foreign_key: activity_id
+  
+    - join: candidates
+      foreign_key: uid
+      
+    - join: jobs
+      foreign_key: nid
+          
+    - join: jobs_categories_facts
+      foreign_key: jobs.category
+      
+    - join: companies
+      foreign_key: jobs.company_uid
+
+- base_view: candidates
+  joins:
+    - join: candidate_activity_facts
+      foreign_key: uid
+      join_type: one_to_one
+
+    - join: candidates_monthly_facts
+      foreign_key: candidates.created_month_key
+
+    - join: tbl_cep
+      sql_on: candidates.cep = tbl_cep.cep
+      join_type: one_to_one
+
+- base_view: interviews
+  joins:
+    - join: candidates
+      foreign_key: uid
+      
+    - join: jobs
+      foreign_key: nid
+      
+    - join: companies
+      foreign_key: jobs.company_uid
+
+- base_view: all_positions_candidates
+  persist_for: 20 hours
+  joins:
+    - join: candidates
+      foreign_key: uid
+      
+    - join: tbl_cep
+      sql_on: candidates.cep = tbl_cep.cep
+      join_type: one_to_one
+      
+    - join: candidate_activity_facts
+      sql_on: candidates.uid = candidate_activity_facts.uid
+
+- base_view: companies
+
+- base_view: jobs
+  joins:
+    - join: jobs_categories_facts
+      foreign_key: jobs.category
+      
+    - join: companies
+      foreign_key: company_uid
+      
+    - join: job_aggregate_info
+      join_type: one_to_one
+      foreign_key: nid
+      
+    - join: job_sms_facts
+      join_type: one_to_one
+      sql_on: jobs.nid = job_sms_facts.nid
+      
+    - join: singular_plural_sms_response
+      join_type: one_to_one
+      sql_on: jobs.nid = singular_plural_sms_response.nid
+
+- base_view: matches_storage
+  joins:
+    - join: jobs
+      foreign_key: nid
+
+    - join: jobs_categories_facts
+      foreign_key: jobs.category
+
+- base_view: ranked
+  joins:
+    - join: jobs
+      foreign_key: nid
+
+- base_view: sms_messages
+- base_view: jobs_algorithms
+
