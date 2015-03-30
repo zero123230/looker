@@ -1,0 +1,53 @@
+- base_view: tbl_cep
+
+- view: tbl_cep
+  sql_table_name: TBL_CEP
+  fields:
+
+  - dimension: id
+    primary_key: true
+    type: int
+    sql: ${TABLE}.ID
+
+  - dimension: central
+    sql: ${TABLE}.CENTRAL
+
+  - dimension: cep
+    type: int
+    sql: ${TABLE}.CEP
+
+  - dimension: cep5
+    type: int
+    sql: ${TABLE}.CEP5
+
+  - dimension: city
+    sql: ${TABLE}.CITY
+
+  - dimension: district
+    sql: ${TABLE}.DISTRICT
+
+  - dimension: name
+    sql: ${TABLE}.NAME
+
+  - dimension: state
+    sql: ${TABLE}.STATE
+
+  - dimension: suburb
+    sql: ${TABLE}.SUBURB
+
+  - dimension: type
+    sql: ${TABLE}.TYPE
+
+  - dimension: x
+    type: number
+    sql: ${TABLE}.X
+
+  - dimension: y
+    type: number
+    sql: ${TABLE}.Y
+
+  - measure: count
+    type: count
+    drill_fields: [id, name]
+
+
