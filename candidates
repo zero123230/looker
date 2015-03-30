@@ -1,0 +1,732 @@
+- view: candidates
+  derived_table:
+    sql_trigger_value: SELECT FLOOR((UNIX_TIMESTAMP(CONVERT_TZ(NOW(),'UTC','America/Sao_Paulo')) - 60*60*5)/(60*60*24))
+    indexes: [uid, date_created, cep]
+    sql: |
+      SELECT ui.*
+        , ur.complete
+        , ur.source
+        , ur.user_keyword
+        , ur.system_keyword
+        , ur.referred_by
+        , ur.referral
+        , ur.utm_source
+        , ur.utm_medium
+        , ur.utm_campaign
+        , ur.utm_term
+        , ur.utm_content
+        , ur.utm_keyword
+        , ur.utm_gclid
+        , ue.match_status
+        , ue.last_profile_update
+        , ue.confirmation_date
+        , ue.last_message_received_tww
+        , ue.last_message_received_movile
+        , ue.last_callback_tww
+        , ue.last_callback_code_tww
+        , ue.last_delivered_callback_tww
+        , ue.last_callback_movile
+        , ue.last_callback_code_movile
+        , ue.last_delivered_callback_movile
+        , ue.last_message_sent_tww
+        , ue.last_message_sent_movile
+        , ue.last_login
+        , ue.first_match
+        , ue.last_match
+        , uas.messages_received
+        , uas.messages_sent
+        , uas.callbacks
+        , uas.friends_confirmed
+        , uas.matches
+        , uas.interested
+        , uas.interview_scheduled
+        , uas.interview_rescheduled
+        , uas.interview_cancelled
+        , uas.interview_show_up_call
+        , uas.interview_no_response_call
+        , uas.interview_no_show_up_call
+        , uas.interview_show_up_sms
+        , uas.interview_no_show_up_sms
+        , uas.interview_no_response_sms
+        , dl.a
+        , dl.b
+        , dl.c
+        , dl.d
+        , dl.e
+        , urt.token AS referral_token
+        , fbid.field_facebook_id_value AS facebook_id
+        , u.status AS profile_status
+        , ecpf.field_employee_cpf_value AS cpf
+        , us.referral_path
+        , us.query_string AS url_query_string
+      FROM user_info ui
+        LEFT JOIN user_registrations ur on ui.uid = ur.uid
+        LEFT JOIN user_engagement ue on ui.uid = ue.uid
+        LEFT JOIN user_activity_summary uas on ui.uid = uas.uid
+        LEFT JOIN ${driver_license.SQL_TABLE_NAME} dl ON ui.uid = dl.uid
+        LEFT JOIN users_referral_token urt ON ui.uid = urt.uid
+        LEFT JOIN profile p ON ui.uid = p.uid
+        LEFT JOIN field_data_field_facebook_id fbid ON p.pid = fbid.entity_id
+        LEFT JOIN users u ON ui.uid = u.uid
+        LEFT JOIN field_revision_field_employee_cpf ecpf ON p.pid = ecpf.entity_id
+        LEFT JOIN users_source us ON ui.uid = us.uid
+      -- if dev -- LIMIT 1000
+
+  fields:
+
+  # DIMENSIONS #
+
+  - filter: category
+    sql: |
+      EXISTS (
+         SELECT * FROM user_info AS ui
+         WHERE {% condition %} ui.category_1 {% endcondition %}
+          OR {% condition %} ui.category_2 {% endcondition %}
+          OR {% condition %} ui.category_3 {% endcondition %}
+        )
+  
+  - filter: position
+    sql: |
+      EXISTS (
+         SELECT * FROM user_info AS ui
+         WHERE {% condition %} ui.position_1 {% endcondition %}
+          OR {% condition %} ui.position_2 {% endcondition %}
+          OR {% condition %} ui.position_3 {% endcondition %}
+        )
+
+  - dimension: uid
+    primary_key: true
+    type: int
+    sql: ${TABLE}.uid
+
+  - dimension: phone_number
+    label: Phone Number
+    sql: ${TABLE}.phone
+
+  - dimension: carrier
+    sql: ${TABLE}.carrier
+
+  - dimension: name
+    sql: ${TABLE}.name
+
+  - dimension_group: created
+    type: time
+    timeframes: [time, date, week, month, year]
+    sql: FROM_UNIXTIME(${TABLE}.date_created)
+
+  - dimension: cep
+    sql: ${TABLE}.cep
+    
+  - dimension: region
+    sql: |
+      CASE
+        WHEN ${cep} between 01000000 and 01999999 THEN 'Centro'
+        WHEN ${cep} between 02000000 and 02999999 THEN 'Zona Norte'
+        WHEN ${cep} between 03000000 and 03999999 THEN 'Zona Leste'
+        WHEN ${cep} between 04000000 and 04999999 THEN 'Zona Sul'
+        WHEN ${cep} between 05000000 and 05999999 THEN 'Zona Oeste'
+        WHEN ${cep} between 06000000 and 06999999 THEN 'Grande Oeste'
+        WHEN ${cep} between 07000000 and 07999999 THEN 'Grande Norte'
+        WHEN ${cep} between 08000000 and 08999999 THEN 'Grande Leste'
+        WHEN ${cep} between 09000000 and 09999999 THEN 'Grande Sul'
+        WHEN ${cep} between 10000000 and 99999999 THEN 'Outros'
+      END
+
+  - dimension: education
+    sql: ${TABLE}.education
+
+  - dimension: email
+    sql: ${TABLE}.email
+
+  - dimension: esp # Finds Email Service Provider of email address
+    sql: substring_index(${email},"@",-1)
+
+  - dimension: valid_email # Valid email address
+    type: yesno
+    sql: |
+      CASE
+        WHEN ${email} REGEXP '^[_a-z0-9-]+([._a-z0-9-]+)@[a-z0-9-]+(\.[a-z0-9-]+)(\.[a-z]{2,4})$'
+        THEN 1
+      END
+
+  - dimension: gender
+    sql: ${TABLE}.sex
+
+  - dimension: salary
+    type: number
+    sql: ${TABLE}.salary
+
+  - dimension: birthday
+    sql: ${TABLE}.birthday
+    type: time
+    timeframes: [date, month, year]
+
+  - dimension: age
+    sql: DATE_FORMAT(FROM_DAYS(TO_DAYS(NOW())-TO_DAYS(${TABLE}.birthday)), '%Y')+0
+    type: number
+    
+  - dimension: category_1
+    sql: ${TABLE}.category_1
+
+  - dimension: position_1
+    sql: ${TABLE}.position_1
+
+  - dimension: experience_1
+    sql: ${TABLE}.experience_1
+
+  - dimension: category_2
+    sql: ${TABLE}.category_2
+
+  - dimension: position_2
+    sql: ${TABLE}.position_2
+
+  - dimension: experience_2
+    sql: ${TABLE}.experience_2
+
+  - dimension: category_3
+    sql: ${TABLE}.category_3
+
+  - dimension: position_3
+    sql: ${TABLE}.position_3
+
+  - dimension: experience_3
+    sql: ${TABLE}.experience_3
+
+  - dimension: all_category_concat # placeholder until Adam talks to Mike about a prettier/more user friendly solution
+    type: string
+    sql: CONCAT(ifnull(${category_1},''),ifnull(${category_2},''),ifnull(${category_3},''))
+
+  - dimension: all_position_concat # placeholder until Adam talks to Mike about a prettier/more user friendly solution
+    type: string
+    sql: CONCAT(ifnull(${position_1},''),ifnull(${position_2},''),ifnull(${position_3},''))
+
+  - dimension: is_complete
+    type: yesno
+    sql: ${TABLE}.complete = 1
+
+  - dimension: source
+    sql: ${TABLE}.source
+
+  - dimension: user_keyword
+    sql: ${TABLE}.user_keyword
+
+  - dimension: system_keyword
+    sql: ${TABLE}.system_keyword
+
+  - dimension: referred_by
+    sql: ${TABLE}.referred_by
+
+  - dimension: referral
+    sql: ${TABLE}.referral
+
+  - dimension: utm_source
+    sql: ${TABLE}.utm_source
+
+  - dimension: utm_medium
+    sql: ${TABLE}.utm_medium
+
+  - dimension: utm_campaign
+    sql: ${TABLE}.utm_campaign
+
+  - dimension: utm_term
+    sql: ${TABLE}.utm_term
+
+  - dimension: utm_content
+    sql: ${TABLE}.utm_content
+    
+  - dimension_group: utm_content_date # Converts UTM Content Dates
+    sql: str_to_date(right(${TABLE}.utm_content,6),'%y%m%d')
+    type: time
+    convert_tz: false # Disables timezone conversion, to fix problem where previous day was displayed
+    timeframes: [date, week, dow, month, year]
+
+#   - dimension: utm_content_date_weekday # Converts UTM Content Converted Dates to Day of Week
+#     sql: DAYNAME(str_to_date(right(${TABLE}.utm_content,6),'%y%m%d'))
+
+  - dimension: campaign_focus # Converts UTM Campaign into Focus of campaign
+    sql: substring_index(${utm_campaign},":",1)
+    
+  - dimension: campaign_job # Converts UTM Campaign into Job target of campaign
+    sql: substring_index(substring_index(${utm_campaign},":",2),":",-1)
+    
+  - dimension: campaign_geography # Converts UTM Campaign into Geography target of campaign
+    sql: substring_index(${utm_campaign},":",-1)
+    
+  - dimension: campaign_job_position
+    sql: |
+      CASE
+        WHEN ${campaign_job} = 'admin' THEN 'Administrativo'
+        WHEN ${campaign_job} = 'constru' THEN 'Construcao'
+        WHEN ${campaign_job} = 'ind' THEN 'Industrial'
+        WHEN ${campaign_job} = 'limp' THEN 'Limpeza'
+        WHEN ${campaign_job} = 'rest' THEN 'Restaurante'
+        WHEN ${campaign_job} = 'serv-gerais' THEN 'Servicos Gerais'
+        WHEN ${campaign_job} = 'tlmkt' THEN 'Telemarketing'
+        WHEN ${campaign_job} = 'trans' THEN 'Transporte'
+        WHEN ${campaign_job} = 'varejo' THEN 'Varejo'
+        WHEN ${campaign_job} = 'vendas' THEN 'Vendas'
+        WHEN ${campaign_job} = 'help-desk' THEN 'Analista de Help Desk'
+        WHEN ${campaign_job} = 'op-recep' THEN 'Op. Call Center Receptivo'
+        WHEN ${campaign_job} = 'op-call' THEN 'Operador Call Center'
+        WHEN ${campaign_job} = 'op-ativo' THEN 'Operador Call Center Ativo'
+        WHEN ${campaign_job} = 'op-cob' THEN 'Operador de Cobranca'
+        WHEN ${campaign_job} = 'assist-adm' THEN 'Assistente Administrativo'
+        WHEN ${campaign_job} = 'escrit' THEN 'Escriturario'
+        WHEN ${campaign_job} = 'off-boy' THEN 'Office Boy'
+        WHEN ${campaign_job} = 'recep' THEN 'Recepcionista'
+        WHEN ${campaign_job} = 'sec' THEN 'Secretaria'
+        WHEN ${campaign_job} = 'assist-com' THEN 'Assistente Comercial'
+        WHEN ${campaign_job} = 'atend-loja' THEN 'Atendente de Loja'
+        WHEN ${campaign_job} = 'balconista' THEN 'Balconista'
+        WHEN ${campaign_job} = 'corr-imoveis' THEN 'Corretor de Imoveis'
+        WHEN ${campaign_job} = 'prom-vendas' THEN 'Promotor de Vendas'
+        WHEN ${campaign_job} = 'vendedor' THEN 'Vendedor'
+        WHEN ${campaign_job} = 'vend-ext' THEN 'Vendedor Externo'
+        WHEN ${campaign_job} = 'carpinteiro' THEN 'Carpinteiro'
+        WHEN ${campaign_job} = 'eletricista' THEN 'Eletricista'
+        WHEN ${campaign_job} = 'encanador' THEN 'Encanador'
+        WHEN ${campaign_job} = 'pedreiro' THEN 'Pedreiro'
+        WHEN ${campaign_job} = 'pintor' THEN 'Pintor'
+        WHEN ${campaign_job} = 'aux-prod' THEN 'Auxiliar de Producao'
+        WHEN ${campaign_job} = 'caldeireiro' THEN 'Caldeireiro'
+        WHEN ${campaign_job} = 'ferramenteiro' THEN 'Ferramenteiro'
+        WHEN ${campaign_job} = 'fresador' THEN 'Fresador'
+        WHEN ${campaign_job} = 'funileiro' THEN 'Funileiro'
+        WHEN ${campaign_job} = 'mec-ind' THEN 'Mecanico Industrial'
+        WHEN ${campaign_job} = 'op-maq' THEN 'Operador de Maquinas'
+        WHEN ${campaign_job} = 'serralheiro' THEN 'Serralheiro'
+        WHEN ${campaign_job} = 'soldador' THEN 'Soldador'
+        WHEN ${campaign_job} = 'torneiro' THEN 'Torneiro'
+        WHEN ${campaign_job} = 'aj-entrega' THEN 'Ajudante de Entrega'
+        WHEN ${campaign_job} = 'aux-motorista' THEN 'Auxiliar de Motorista'
+        WHEN ${campaign_job} = 'manobrista' THEN 'Manobrista'
+        WHEN ${campaign_job} = 'motoboy' THEN 'Motoboy'
+        WHEN ${campaign_job} = 'motorista' THEN 'Motorista'
+        WHEN ${campaign_job} = 'mot-entreg' THEN 'Motorista Entregador'
+        WHEN ${campaign_job} = 'op-estac' THEN 'Operador de Estacionamento'
+        WHEN ${campaign_job} = 'aj-coz' THEN 'Ajudante de Cozinha'
+        WHEN ${campaign_job} = 'atend-rest' THEN 'Atendente'
+        WHEN ${campaign_job} = 'barman' THEN 'Barman'
+        WHEN ${campaign_job} = 'coz' THEN 'Cozinheiro'
+        WHEN ${campaign_job} = 'garcom' THEN 'Garcom'
+        WHEN ${campaign_job} = 'aux-tec-tel' THEN 'Aux. Tecnico em Telecom'
+        WHEN ${campaign_job} = 'aux-manut' THEN 'Auxiliar de Manutencao'
+        WHEN ${campaign_job} = 'aux-serv-gerais' THEN 'Auxiliar de Servicos Gerais'
+        WHEN ${campaign_job} = 'copeira' THEN 'Copeira'
+        WHEN ${campaign_job} = 'jardineiro' THEN 'Jardineiro'
+        WHEN ${campaign_job} = 'porteiro' THEN 'Porteiro'
+        WHEN ${campaign_job} = 'vigilante' THEN 'Vigilante'
+        WHEN ${campaign_job} = 'zelador' THEN 'Zelador'
+        WHEN ${campaign_job} = 'aux-limp' THEN 'Auxiliar de Limpeza'
+        WHEN ${campaign_job} = 'domestica' THEN 'Domestica'
+        WHEN ${campaign_job} = 'faxineiro' THEN 'Faxineiro'
+        WHEN ${campaign_job} = 'lavador-autos' THEN 'Lavador de Auto'
+        WHEN ${campaign_job} = 'sup-limp' THEN 'Supervisor de Limpeza'
+        WHEN ${campaign_job} = 'acougueiro' THEN 'Acougueiro'
+        WHEN ${campaign_job} = 'atend-loja' THEN 'Atendente de Loja'
+        WHEN ${campaign_job} = 'balconista' THEN 'Balconista'
+        WHEN ${campaign_job} = 'confeiteiro' THEN 'Confeiteiro'
+        WHEN ${campaign_job} = 'conferente' THEN 'Conferente'
+        WHEN ${campaign_job} = 'estoquista' THEN 'Estoquista'
+        WHEN ${campaign_job} = 'fisc-loja' THEN 'Fiscal de Loja'
+        WHEN ${campaign_job} = 'op-de-caixa' THEN 'Operador de Caixa'
+        WHEN ${campaign_job} = 'repositor' THEN 'Repositor'
+      END
+
+  - dimension: campaign_job_category
+    sql: |
+      CASE
+        WHEN ${campaign_job} = 'admin' OR ${campaign_job} = 'assist-adm' OR ${campaign_job} = 'escrit' OR ${campaign_job} = 'off-boy' OR ${campaign_job} = 'recep' OR ${campaign_job} = 'sec' THEN 'Administrativo'
+        WHEN ${campaign_job} = 'constru' OR ${campaign_job} = 'carpinteiro' OR ${campaign_job} = 'eletricista' OR ${campaign_job} = 'encanador' OR ${campaign_job} = 'pedreiro' OR ${campaign_job} = 'pintor' THEN 'Construcao'
+        WHEN ${campaign_job} = 'ind' OR ${campaign_job} = 'aux-prod' OR ${campaign_job} = 'caldeireiro' OR ${campaign_job} = 'ferramenteiro' OR ${campaign_job} = 'fresador' OR ${campaign_job} = 'funileiro' OR ${campaign_job} = 'mec-ind' OR ${campaign_job} = 'op-maq' OR ${campaign_job} = 'serralheiro' OR ${campaign_job} = 'soldador' OR ${campaign_job} = 'torneiro' THEN 'Industrial'
+        WHEN ${campaign_job} = 'limp' OR ${campaign_job} = 'aux-limp' OR ${campaign_job} = 'domestica' OR ${campaign_job} = 'faxineiro' OR ${campaign_job} = 'lavador-autos' OR ${campaign_job} = 'sup-limp' THEN 'Limpeza'
+        WHEN ${campaign_job} = 'rest' OR ${campaign_job} = 'aj-coz' OR ${campaign_job} = 'atend-rest' OR ${campaign_job} = 'barman' OR ${campaign_job} = 'coz' OR ${campaign_job} = 'garcom' THEN 'Restaurante'
+        WHEN ${campaign_job} = 'serv-gerais' OR ${campaign_job} = 'aux-tec-tel' OR ${campaign_job} = 'aux-manut' OR ${campaign_job} = 'aux-serv-gerais' OR ${campaign_job} = 'copeira' OR ${campaign_job} = 'jardineiro' OR ${campaign_job} = 'porteiro' OR ${campaign_job} = 'vigilante' OR ${campaign_job} = 'zelador' THEN 'Servicos Gerais'
+        WHEN ${campaign_job} = 'tlmkt' OR ${campaign_job} = 'help-desk' OR ${campaign_job} = 'op-recep' OR ${campaign_job} = 'op-call' OR ${campaign_job} = 'op-ativo' OR ${campaign_job} = 'op-cob' THEN 'Telemarketing'
+        WHEN ${campaign_job} = 'trans' OR ${campaign_job} = 'aj-entrega' OR ${campaign_job} = 'aux-motorista' OR ${campaign_job} = 'manobrista' OR ${campaign_job} = 'motoboy' OR ${campaign_job} = 'motorista' OR ${campaign_job} = 'mot-entreg' OR ${campaign_job} = 'op-estac' THEN 'Transporte'
+        WHEN ${campaign_job} = 'varejo' OR ${campaign_job} = 'acougueiro' OR ${campaign_job} = 'atend-loja' OR ${campaign_job} = 'balconista' OR ${campaign_job} = 'confeiteiro' OR ${campaign_job} = 'conferente' OR ${campaign_job} = 'estoquista' OR ${campaign_job} = 'fisc-loja' OR ${campaign_job} = 'op-de-caixa' OR ${campaign_job} = 'repositor' THEN 'Varejo'
+        WHEN ${campaign_job} = 'vendas' OR ${campaign_job} = 'assist-com' OR ${campaign_job} = 'atend-loja' OR ${campaign_job} = 'balconista' OR ${campaign_job} = 'corr-imoveis' OR ${campaign_job} = 'prom-vendas' OR ${campaign_job} = 'vendedor' OR ${campaign_job} = 'vend-ext' THEN 'Vendas'
+        ELSE NULL
+      END
+
+  - dimension: utm_keyword
+    sql: ${TABLE}.utm_keyword
+
+  - dimension: utm_gclid
+    sql: ${TABLE}.utm_gclid
+
+  - dimension: match_status
+    sql: ${TABLE}.match_status
+
+  - dimension_group: last_profile_update
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.last_profile_update)
+
+  - dimension_group: confirmation_date
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.confirmation_date)
+
+  - dimension_group: last_message_received_tww
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.last_message_received_tww)
+
+  - dimension_group: last_message_received_movile
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.last_message_received_movile)
+
+  - dimension_group: last_callback_tww
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.last_callback_tww)
+
+  - dimension_group: last_callback_code_tww
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.last_callback_code_tww)
+
+  - dimension_group: last_delivered_callback_tww
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.last_delivered_callback_tww)
+
+  - dimension_group: last_callback_movile
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.last_callback_movile)
+
+  - dimension_group: last_callback_code_movile
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.last_callback_code_movile)
+
+  - dimension_group: last_delivered_callback_movile
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.last_delivered_callback_movile)
+
+  - dimension_group: last_message_sent_tww
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.last_message_sent_tww)
+
+  - dimension_group: last_message_sent_movile
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.last_message_sent_movile)
+
+  - dimension_group: last_login
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.last_login)
+
+  - dimension_group: first_match
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.first_match)
+    
+  - dimension_group: last_match
+    type: time
+    timeframes: [time]
+    sql: FROM_UNIXTIME(${TABLE}.last_match)
+
+  - dimension: messages_received
+    type: number
+    sql: ${TABLE}.messages_received
+
+  - dimension: messages_sent
+    type: number
+    sql: ${TABLE}.messages_sent
+
+  - dimension: callbacks
+    type: number
+    sql: ${TABLE}.callbacks
+
+  - dimension: friends_confirmed
+    type: number
+    sql: ${TABLE}.friends_confirmed
+
+  - dimension: matches
+    type: number
+    sql: ${TABLE}.matches
+
+  - dimension: interested
+    type: number
+    sql: ${TABLE}.interested
+
+  - dimension: interview_scheduled
+    type: number
+    sql: ${TABLE}.interview_scheduled
+
+  - dimension: interview_rescheduled
+    type: number
+    sql: ${TABLE}.interview_rescheduled
+
+  - dimension: interview_cancelled
+    type: number
+    sql: ${TABLE}.interview_cancelled
+
+  - dimension: interview_show_up_call
+    type: number
+    sql: ${TABLE}.interview_show_up_call
+
+  - dimension: interview_no_response_call
+    type: number
+    sql: ${TABLE}.interview_no_response_call
+
+  - dimension: interview_no_show_up_call
+    type: number
+    sql: ${TABLE}.interview_no_show_up_call
+
+  - dimension: interview_show_up_sms
+    type: number
+    sql: ${TABLE}.interview_show_up_sms
+
+  - dimension: interview_no_show_up_sms
+    type: number
+    sql: ${TABLE}.interview_no_show_up_sms
+
+  - dimension: interview_no_response_sms
+    type: number
+    sql: ${TABLE}.interview_no_response_sms
+
+  - dimension: interview_show_up
+    type: number
+    sql: |
+      CASE
+        WHEN interview_show_up_sms = 1 OR interview_show_up_sms = 1 AND interview_no_show_up_call <> 1 THEN 1
+        ELSE 0
+      END
+
+  - dimension: created_month_key
+    hidden: true
+    sql: DATE_FORMAT(${created_date},'%Y-%m')
+
+  - dimension: driver_license_a
+    type: number
+    sql: ${TABLE}.a
+
+  - dimension: driver_license_b
+    type: number
+    sql: ${TABLE}.b
+
+  - dimension: driver_license_c
+    type: number
+    sql: ${TABLE}.c
+    
+  - dimension: driver_license_d
+    type: number
+    sql: ${TABLE}.c
+
+  - dimension: driver_license_e
+    type: number
+    sql: ${TABLE}.e
+
+  - dimension: driver_license
+    sql: |
+      CONCAT(
+        IF(a, 'A ', ''),
+        IF(b, 'B ', ''),
+        IF(c, 'C ', ''),
+        IF(d, 'D ', ''),
+        IF(e, 'E', '')
+      )
+      
+  - dimension: referral_token
+    sql: ${TABLE}.referral_token
+
+  - dimension: facebook_id
+    type: string
+    sql: ${TABLE}.facebook_id
+
+  - dimension: has_facebook_id
+    type: yesno
+    sql: ${TABLE}.facebook_id IS NOT NULL
+  
+  - dimension: is_source_mobile_app
+    type: yesno
+    sql: ${TABLE}.source = "mobile-app"  
+    
+  - dimension: profile_status
+    type: number
+    sql: ${TABLE}.profile_status
+
+  - dimension: matchable # In the future, experiment with adding WHEN count(*) > 0 then true else false end from tbl_cep where cep5 = SUBSTRING(${cep}, 1, 5)
+    type: yesno
+    sql: |
+      CASE
+        WHEN ${profile_status} = 1 AND ${match_status} = 0
+        AND ${cep} BETWEEN 01000000 AND 99999999
+        AND ${education} IS NOT NULL
+        AND ((${category_1} IS NOT NULL AND ${position_1} IS NOT NULL AND ${experience_1} IS NOT NULL)
+        OR (${category_2} IS NOT NULL AND ${position_2} IS NOT NULL AND ${experience_2} IS NOT NULL)
+        OR (${category_3} IS NOT NULL AND ${position_3} IS NOT NULL AND ${experience_3} IS NOT NULL))
+        AND ${phone_number} BETWEEN 1100000000 AND 99999999999
+        THEN 1
+      END
+      
+  - dimension: cpf
+    type: string
+    sql: ${TABLE}.cpf
+    
+  - dimension: referral_path
+    type: string
+    sql: ${TABLE}.referral_path
+    
+  - dimension: url_query_string
+    type: string
+    sql: ${TABLE}.url_query_string
+  
+  - dimension: channel # last updated AAAAMMDD
+    sql: |
+      CASE
+        -- Promoters
+        WHEN ${source} = 'cv-promoters' THEN 'Promoters'
+        
+        -- Mobile App
+        WHEN ${source} = 'mobile-app' THEN 'App'
+        
+        -- Online Sources
+        WHEN ${utm_medium} = 'cpc' THEN 'Search'
+        WHEN ${utm_medium} = 'dply' THEN 'Display'
+        WHEN ${source} = 'facebook-app' THEN 'Facebook'
+        WHEN ${utm_medium} = 'social' THEN 'Social'
+        WHEN ${utm_source} = 'web-invite' THEN 'Amigo'
+        WHEN ${utm_source} = 'parceiro' THEN 'Parceiro'
+        WHEN ${utm_source} = 'facebook' THEN 'Facebook'
+        WHEN LOWER(${utm_source}) = 'facebook' THEN 'Facebook'  # double check this
+        WHEN ${referral} LIKE '%facebook%' THEN 'Social'  # double check this
+        WHEN ${referral} LIKE 'meuemprego%' THEN 'Blog'  # double check this
+        WHEN ${referral} LIKE '%doubleclick%' THEN 'Display'
+        WHEN ${referral} LIKE '%google.%' THEN 'Organic'
+        WHEN ${referral} LIKE '%linkedin.com%' THEN 'Social'
+        WHEN ${referral} LIKE '%twitter.com%' THEN 'Social'
+        WHEN ${referral} LIKE '%t.co%' THEN 'Social'
+        WHEN ${utm_medium} = 'email' THEN 'Email'
+        WHEN ${source} = 'online' AND ${referral} = 'direct' THEN 'Direct'
+        WHEN ${source} = 'online' THEN 'Referral'
+        
+        -- SMS Sources
+        WHEN ${system_keyword} IN('quero', 'meta', 'chefe', 'ligado', 'auto') THEN 'Facebook-SMS'
+        WHEN ${system_keyword} IN('trabalho', 'vaga') THEN 'Flyer'
+        WHEN ${system_keyword} IN('emprego','cadastro','registro') THEN 'Jornais'
+        WHEN ${system_keyword} = 'amigo' THEN 'Amigo-SMS'
+        WHEN ${system_keyword} = 'gratis' THEN 'Bus/Metro'
+        WHEN ${user_keyword} LIKE '11%' THEN 'Number'   # double check this
+        
+        WHEN ${source} = 'sms' THEN 'Other-SMS'
+      END
+    
+
+#   elseif CONTAINS([utm_source],"acebook") # IN(x,y,z)
+#   then "Facebook"
+#   WHEN len(${system_keyword}) >= 1 THEN 'Other-SMS-Paid'
+#   elseif contains([user_keyword],"11")
+#   then "Number"
+
+
+  # MEASURES #
+  
+  - measure: count
+    type: count
+    detail: detail*
+    
+  - measure: percent_of_total_count
+    type: percent_of_total
+    sql: ${count}
+    
+  - measure: count_with_campaign_job_category
+    type: number
+    sql: |
+      COUNT(
+        CASE WHEN (${category_1} = ${campaign_job_category} OR 
+        ${category_2} = ${campaign_job_category} OR 
+        ${category_3} = ${campaign_job_category}) THEN 1
+        ELSE NULL
+        END
+      )
+
+  - measure: percent_with_campaign_job_category
+    type: percent_of_total
+    sql: ${count_with_campaign_job_category}
+  
+#  - measure: days_since_last_match
+#    type: number
+#    sql: |
+#      CASE
+#        WHEN ${last_match} IS NOT NULL THEN DATEDIFF(CURDATE(),DATE(${last_match}))
+#        ELSE NULL
+#      END
+    
+  # SETS #
+  
+  sets:
+    detail:
+      - uid
+      - phone_number
+      - carrier
+      - name
+      - date_created
+      - cep
+      - education
+      - email
+      - sex
+      - salary
+      - birthday
+      - category_1
+      - position_1
+      - experience_1
+      - category_2
+      - position_2
+      - experience_2
+      - category_3
+      - position_3
+      - experience_3
+      - complete
+      - source
+      - user_keyword
+      - system_keyword
+      - referred_by
+      - referral
+      - utm_source
+      - utm_medium
+      - utm_campaign
+      - utm_term
+      - utm_content
+      - utm_keyword
+      - utm_gclid
+      - match_status
+      - last_profile_update
+      - confirmation_date
+      - last_message_received_tww
+      - last_message_received_movile
+      - last_callback_tww
+      - last_callback_code_tww
+      - last_delivered_callback_tww
+      - last_callback_movile
+      - last_callback_code_movile
+      - last_delivered_callback_movile
+      - last_message_sent_tww
+      - last_message_sent_movile
+      - last_login
+      - first_match
+      - last_match
+      - messages_received
+      - messages_sent
+      - callbacks
+      - friends_confirmed
+      - matches
+      - interested
+      - interview_scheduled
+      - interview_rescheduled
+      - interview_cancelled
+      - interview_show_up_call
+      - interview_no_response_call
+      - interview_no_show_up_call
+      - interview_show_up_sms
+      - interview_no_show_up_sms
+      - interview_no_response_sms
+
