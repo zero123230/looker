@@ -1,0 +1,206 @@
+- view: recruitment_activities
+  derived_table:
+    indexes: [uid, nid, activity_id]
+    sql_trigger_value: SELECT FLOOR((UNIX_TIMESTAMP(CONVERT_TZ(NOW(),'UTC','America/Sao_Paulo')) - 60*60*5)/(60*60*24))
+    sql: |
+      SELECT
+        a1.id AS id
+        , 'pre_interview' AS type
+        , a1.date AS date
+        , a1.uid AS uid
+        , a1.nid AS nid
+        , a1.activity_id AS activity_id
+      FROM employees_activity AS a1
+      UNION
+      SELECT
+        a2.id AS id
+        , 'post_interview' AS type
+        , a2.date AS date
+        , a2.uid AS uid
+        , a2.nid AS nid
+        , a2.activity_id AS activity_id
+      FROM employees_internal_activity AS a2
+
+
+  fields:
+  - dimension: activity_id
+    type: int
+    hidden: true
+    sql: ${TABLE}.activity_id
+    
+  - dimension: type
+    hidden: true
+    sql: ${TABLE}.type
+    
+  - dimension_group: date
+    type: time
+    timeframes: [time, hour, date, week, month, year, hod, dow]
+    sql: FROM_UNIXTIME(${TABLE}.date)
+
+  - dimension: nid
+    type: int
+    hidden: true
+    sql: ${TABLE}.nid
+
+  - dimension: uid
+    type: int
+    hidden: true
+    sql: ${TABLE}.uid
+
+  # MEASURES #
+
+  - measure: count
+    type: count
+    detail: detail*
+
+  - measure: candidates_contacted
+    type: count_distinct
+    sql: CONCAT(${uid}, ${nid})
+    filters:
+      activity_id: 1
+      type: pre_interview
+      
+  - measure: unique_candidates_contacted
+    type: count_distinct
+    sql: ${uid}
+    filters:
+      activity_id: 1
+      type: pre_interview
+      
+  - measure: candidates_requested_salary_info
+    type: count_distinct
+    sql: CONCAT(${uid}, ${nid})
+    filters:
+      activity_id: 9
+      type: pre_interview
+      
+  - measure: unique_candidates_requested_salary_info
+    type: count_distinct
+    sql: ${uid}
+    filters:
+      activity_id: 9
+      type: pre_interview    
+  
+  - measure: candidates_requested_job_description
+    type: count_distinct
+    sql: CONCAT(${uid}, ${nid})
+    filters:
+      activity_id: 16
+      type: pre_interview
+      
+  - measure: unique_candidates_requested_job_description
+    type: count_distinct
+    sql: ${uid}
+    filters:
+      activity_id: 16
+      type: pre_interview  
+      
+  - measure: candidates_requested_interview_times
+    type: count_distinct
+    sql: CONCAT(${uid}, ${nid})
+    filters:
+      activity_id: 2
+      type: pre_interview
+      
+  - measure: unique_candidates_requested_interview_times
+    type: count_distinct
+    sql: ${uid}
+    filters:
+      activity_id: 2
+      type: pre_interview
+      
+  - measure: candidates_attended
+    type: count_distinct
+    sql: CONCAT(${uid}, ${nid})
+    filters:
+      activity_id: 1, 10
+      type: post_interview
+      
+  - measure: unique_candidates_attended
+    type: count_distinct
+    sql: ${uid}
+    filters:
+      activity_id: 1, 10
+      type: post_interview
+      
+  - measure: candidates_did_not_attend
+    type: count_distinct
+    sql: CONCAT(${uid}, ${nid})
+    filters:
+      activity_id: 3, 4, 5, 6, 7, 8, 9
+      type: post_interview    
+      
+  - measure: candidates_did_not_answer_phone
+    type: count_distinct
+    sql: CONCAT(${uid}, ${nid})
+    filters:
+      activity_id: 2
+      type: post_interview    
+      
+  - measure: candidates_scheduled_for_interview
+    type: count_distinct
+    sql: CONCAT(${uid}, ${nid})
+    filters:
+      activity_id: 3
+      type: pre_interview
+      
+  - measure: unique_candidates_scheduled_for_interview
+    type: count_distinct
+    sql: CONCAT(${uid})
+    filters:
+      activity_id: 3
+      type: pre_interview
+      
+  - measure: cancelled_interviews
+    type: count_distinct
+    sql: CONCAT(${uid}, ${nid})
+    filters:
+      activity_id: 11, 12, 14
+      type: pre_interview
+      
+  - measure: candidates_cancelled_interview_via_SMS
+    type: count_distinct
+    sql: CONCAT(${uid}, ${nid})
+    filters:
+      activity_id: 12
+      type: pre_interview
+      
+  - measure: candidates_cancelled_interview_no_dates
+    type: count_distinct
+    sql: CONCAT(${uid}, ${nid})
+    filters:
+      activity_id: 11
+      type: pre_interview
+      
+  - measure: company_cancelled_interview
+    type: count_distinct
+    sql: CONCAT(${uid}, ${nid})
+    filters:
+      activity_id: 14
+      type: pre_interview    
+      
+  - measure: unique_cancelled_interviews
+    type: count_distinct
+    sql: CONCAT(${uid})
+    filters:
+      activity_id: 11, 12, 14
+      type: pre_interview
+  
+  - measure: interviews_confirmed
+    type: number
+    sql: (${candidates_scheduled_for_interview} - ${cancelled_interviews})
+    
+  - measure: unique_interviews_confirmed
+    type: number
+    sql: (${unique_candidates_scheduled_for_interview} - ${unique_cancelled_interviews})
+    
+  - measure: candidates_percent_requested_salary_info
+    type: number
+    sql: NULLIF(${candidates_requested_salary_info} / ${candidates_contacted}, 0) * 100
+    format: "%.2f%%"
+    
+  - measure: candidates_percent_scheduled
+    type: number
+    sql: NULLIF(${candidates_scheduled_for_interview} / ${candidates_contacted}, 0) * 100
+    format: "%.2f%%"
+
