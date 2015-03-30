@@ -1,0 +1,266 @@
+- view: companies
+  derived_table:
+    sql_trigger_value: SELECT FLOOR((UNIX_TIMESTAMP(CONVERT_TZ(NOW(),'UTC','America/Sao_Paulo')) - 60*60*5)/(60*60*24))
+    indexes: [uid, created]
+    sql: |
+      SELECT users.uid
+        , users.mail
+        , users.created
+        , reg.referral
+        , reg.utm_source
+        , reg.utm_medium
+        , reg.utm_campaign
+        , reg.utm_term
+        , reg.utm_keyword
+        , reg.utm_content
+        , reg.utm_gclid
+        , approved.created AS `approved`
+        , field_cnpj_number_value
+        , field_contact_name_value
+        , field_employer_phone_value
+        , field_paying_company_value
+        , field_company_apt_value
+        , field_company_city_value
+        , field_company_description_value
+        , field_company_employees_value
+        , field_company_mobile_phone_value
+        , field_company_name_value
+        , field_company_street_name_value
+        , field_company_street_number_value
+        , field_company_suburb_value
+        , field_company_type_value
+        , field_company_website_value
+        , field_company_zip_value
+        , field_company_admin_user_value
+      FROM users
+        INNER JOIN profile ON users.uid = profile.uid AND profile.type = 'employer'
+        LEFT JOIN field_data_field_parent_employer pe ON profile.pid = pe.entity_id
+        LEFT JOIN company_registrations reg ON users.uid = reg.uid
+        LEFT JOIN employer_approved approved ON users.uid = approved.uid
+        LEFT JOIN field_data_field_cnpj_number cnpj ON profile.pid = cnpj.entity_id
+        LEFT JOIN field_data_field_contact_name contact ON profile.pid = contact.entity_id
+        LEFT JOIN field_data_field_employer_phone phone ON profile.pid = phone.entity_id
+        LEFT JOIN field_data_field_paying_company paying ON profile.pid = paying.entity_id
+        LEFT JOIN field_data_field_company_apt apt ON profile.pid = apt.entity_id
+        LEFT JOIN field_data_field_company_city city ON profile.pid = city.entity_id
+        LEFT JOIN field_data_field_company_description descr ON profile.pid = descr.entity_id
+        LEFT JOIN field_data_field_company_employees employees ON profile.pid = employees.entity_id
+        LEFT JOIN field_data_field_company_mobile_phone mobile ON profile.pid = mobile.entity_id
+        LEFT JOIN field_data_field_company_name name ON profile.pid = name.entity_id
+        LEFT JOIN field_data_field_company_street_name stname ON profile.pid = stname.entity_id
+        LEFT JOIN field_data_field_company_street_number stnum ON profile.pid = stnum.entity_id
+        LEFT JOIN field_data_field_company_suburb suburb ON profile.pid = suburb.entity_id
+        LEFT JOIN field_data_field_company_type type ON profile.pid = type.entity_id
+        LEFT JOIN field_data_field_company_website website ON profile.pid = website.entity_id
+        LEFT JOIN field_data_field_company_zip zip ON profile.pid = zip.entity_id
+        LEFT JOIN field_data_field_company_admin_user admin_user ON profile.pid = admin_user.entity_id
+      WHERE pe.field_parent_employer_uid IS NULL
+  fields:
+
+  # DIMENSIONS #
+
+  - dimension: uid
+    primary_key: true
+    type: int
+    sql: ${TABLE}.uid
+
+  - dimension: email
+    sql: ${TABLE}.mail
+
+  - dimension_group: created
+    type: time
+    timeframes: [date, week, month, year]
+    sql: FROM_UNIXTIME(${TABLE}.created)
+
+  - dimension: referral
+    sql: ${TABLE}.referral
+
+  - dimension: utm_source
+    sql: ${TABLE}.utm_source
+
+  - dimension: utm_medium
+    sql: ${TABLE}.utm_medium
+
+  - dimension: utm_campaign
+    sql: ${TABLE}.utm_campaign
+
+  - dimension: utm_term
+    sql: ${TABLE}.utm_term
+
+  - dimension: utm_keyword
+    sql: ${TABLE}.utm_keyword
+
+  - dimension: utm_content
+    sql: ${TABLE}.utm_content
+
+  - dimension: utm_gclid
+    sql: ${TABLE}.utm_gclid
+
+  - dimension_group: approved
+    type: time
+    timeframes: [date, week, month, year]
+    sql: FROM_UNIXTIME(${TABLE}.approved)
+
+  - dimension: is_approved
+    type: yesno
+    sql: ${TABLE}.approved IS NOT NULL
+
+  - dimension: cnpj_number
+    type: int
+    sql: ${TABLE}.field_cnpj_number_value
+
+  - dimension: contact_name
+    sql: ${TABLE}.field_contact_name_value
+
+  - dimension: phone_number
+    type: int
+    sql: ${TABLE}.field_employer_phone_value
+
+  - dimension: is_paying
+    type: yesno
+    sql: ${TABLE}.field_paying_company_value = 1
+
+  - dimension: apt
+    sql: ${TABLE}.field_company_apt_value
+
+  - dimension: city
+    sql: ${TABLE}.field_company_city_value
+
+  - dimension: description
+    sql: ${TABLE}.field_company_description_value
+
+  # This one is a bit of a hack: rather than simply having a text type, we assign specific 
+  # integer values and then cast the dimension as a tier type. This enables UX consistency 
+  # and better sorting behavior in Explore.
+  - dimension: size_tier
+    type: tier
+    tiers: [1,26,51,101,501,1001]
+    sql: |
+      CASE
+        WHEN ${TABLE}.field_company_employees_value = 0 THEN 1
+        WHEN ${TABLE}.field_company_employees_value = 1 THEN 26
+        WHEN ${TABLE}.field_company_employees_value = 2 THEN 51
+        WHEN ${TABLE}.field_company_employees_value = 3 THEN 101
+        WHEN ${TABLE}.field_company_employees_value = 4 THEN 501
+        WHEN ${TABLE}.field_company_employees_value = 5 THEN 1001
+      END
+
+  - dimension: mobile_phone
+    sql: ${TABLE}.field_company_mobile_phone_value
+
+  - dimension: name
+    sql: ${TABLE}.field_company_name_value
+
+  - dimension: street_name
+    sql: ${TABLE}.field_company_street_name_value
+
+  - dimension: street_number
+    sql: ${TABLE}.field_company_street_number_value
+
+  - dimension: suburb
+    sql: ${TABLE}.field_company_suburb_value
+
+  - dimension: type
+    sql: |
+      CASE
+        WHEN ${TABLE}.field_company_type_value = 0 THEN 'Telemarketing'
+        WHEN ${TABLE}.field_company_type_value = 1 THEN 'Supermercado'
+        WHEN ${TABLE}.field_company_type_value = 2 THEN 'Construção'
+        WHEN ${TABLE}.field_company_type_value = 3 THEN 'Administrativa'
+        WHEN ${TABLE}.field_company_type_value = 4 THEN 'Vendas'
+        WHEN ${TABLE}.field_company_type_value = 5 THEN 'Industrial'
+        WHEN ${TABLE}.field_company_type_value = 6 THEN 'Transporte'
+        WHEN ${TABLE}.field_company_type_value = 7 THEN 'Restaurante'
+        WHEN ${TABLE}.field_company_type_value = 8 THEN 'Limpeza'
+        WHEN ${TABLE}.field_company_type_value = 9 THEN 'Financeira'
+        WHEN ${TABLE}.field_company_type_value = 10 THEN 'TI'
+        WHEN ${TABLE}.field_company_type_value = 11 THEN 'Jurídica'
+        WHEN ${TABLE}.field_company_type_value = 12 THEN 'Consultoria'
+        WHEN ${TABLE}.field_company_type_value = 13 THEN 'Profissional'
+        WHEN ${TABLE}.field_company_type_value = 14 THEN 'Outro'
+        WHEN ${TABLE}.field_company_type_value = 15 THEN 'Prestadora de Serviços'
+      END
+
+  - dimension: website
+    sql: ${TABLE}.field_company_website_value
+
+  - dimension: zip
+    type: int
+    sql: ${TABLE}.field_company_zip_value
+
+  - dimension: sales_admin_user
+    type: int
+    sql: ${TABLE}.field_company_admin_user_value
+
+  - dimension: channel
+    sql: |
+      CASE
+      
+        -- Internal Account Creation (Claudio, Paulo, Caroline, etc.)
+        WHEN ${sales_admin_user} > 0 OR ${referral} = "backoffice.empregoligado.com.br" THEN "Internal Sales"
+
+        -- Online Sources
+        WHEN ${utm_medium} = 'cpc' THEN 'Search'
+        WHEN ${utm_medium} = 'dply' THEN 'Display'
+        WHEN ${utm_medium} = 'rmkt' THEN 'Remarketing'
+        WHEN ${utm_source} = 'facebook-app' THEN 'Facebook'
+        WHEN ${utm_medium} = 'social' THEN 'Social'
+        WHEN ${utm_source} = 'web-invite' THEN 'Amigo'
+        WHEN ${utm_medium} = 'email' THEN 'Email'
+        WHEN ${utm_source} = 'amarelinho' THEN 'Amarelinho'
+        WHEN ${utm_source} = 'preparacursos' THEN 'Preparacursos'
+        WHEN LOWER(${utm_source}) = 'linkedin' THEN 'LinkedIn'  # double check this
+        WHEN ${utm_source} = 'facebook' THEN 'Facebook'
+        WHEN LOWER(${utm_source}) = 'facebook' THEN 'Facebook'  # double check this
+        WHEN ${referral} LIKE '%facebook%' THEN 'Facebook Social'  # double check this
+        WHEN ${referral} LIKE '%linkedin%' THEN 'LinkedIn Social'  # double check this
+        WHEN ${referral} LIKE 'meuemprego%' THEN 'B2C Blog'  # double check this
+        WHEN ${referral} LIKE 'recrutar%' THEN 'B2B Blog'  # double check this
+        WHEN ${referral} LIKE '%doubleclick%' THEN 'Display'
+        WHEN ${referral} LIKE '%google.%' AND ${created_date} < '2014-03-01' THEN "Google Search/Organic" # Can't differentiate between Google Search and Organic before UTM structure was in place March 2014
+        WHEN ${referral} LIKE '%google.%' THEN 'Organic'
+        WHEN ${referral} LIKE '%twitter.com%' THEN 'Social'
+        WHEN ${referral} LIKE '%t.co%' THEN 'Social'
+        WHEN ${referral} = 'direct' THEN 'Direct'
+        ELSE 'Referral' # CHECK THIS
+      END
+
+  # MEASURES #
+  
+  - measure: count
+    type: count
+    detail: detail*
+  
+  # SETS #
+
+  sets:
+    detail:
+      - uid
+      - email
+      - created_date
+      - referral
+      - utm_source
+      - utm_medium
+      - utm_campaign
+      - utm_term
+      - utm_keyword
+      - utm_content
+      - utm_gclid
+      - approved_date
+      - is_approved
+      - cnpj_number
+      - contact_name
+      - phone_number
+      - is_paying
+      - apt
+      - city
+      - description
+      - size_tier
+      - mobile_phone
+      - name
+      - street_name
+      - street_number
+      - suburb
+      - type
+      - website
+      - zip
