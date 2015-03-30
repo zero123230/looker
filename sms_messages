@@ -1,0 +1,65 @@
+- view: sms_messages
+  fields:
+
+  - dimension: batch_id
+    type: int
+    hidden: true
+    sql: ${TABLE}.batch_id
+
+  - dimension: carrier
+    sql: ${TABLE}.carrier
+
+  - dimension_group: date
+    type: time
+    timeframes: [time, hour, date, week, month, year]
+    sql: FROM_UNIXTIME(${TABLE}.date)
+
+  - dimension: integrator
+    sql: ${TABLE}.integrator
+
+  - dimension: message
+    sql: ${TABLE}.message
+
+  - dimension: phone
+    type: number
+    sql: ${TABLE}.phone
+
+  - dimension: send_options
+    sql: ${TABLE}.send_options
+
+  - dimension: sms_id
+    type: int
+    sql: ${TABLE}.sms_id
+
+  - dimension: state
+    sql: ${TABLE}.state
+
+  - dimension: tracking_id
+    sql: ${TABLE}.tracking_id
+
+  - dimension: uid
+    type: int
+    sql: ${TABLE}.uid
+
+  - measure: count
+    type: count
+    detail: detail*
+    
+  - measure: count_date_expired
+    type: count
+    filters:
+      message: "Desculpe^, a agenda p/ entrevistas esta lotada. A empresa precisa de um periodo de 8 horas para confirmar as entrevistas. Continuaremos mandando vagas"
+      state: 'send'
+      
+  - measure: count_candidate_stopped
+    type: count
+    filters:
+      message: "Desculpe! As entrevistas normalmente sao marcadas durante as primeiras 24 horas. E rapido mesmo! Na proxima vez seja o primeiro^, fique ligado! :)"
+      state: 'send'
+
+
+  # ----- Detail ------
+  sets:
+    detail:
+
+
