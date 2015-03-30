@@ -1,0 +1,60 @@
+- dashboard: user_behavior_retention
+  title: User Behavior Retention
+  layout: tile
+  tile_size: 100
+
+  filters:
+  - name: activity_type
+    type: select_filter
+    base_view: candidates_activity_labels
+    dimension: candidates_activity_labels.label
+    default_value: "Received offer"
+
+  - name: cohort_month
+    title: "Cohort Date"
+    type: date_filter
+    default_value: 12 months
+
+  - name: activity_month
+    title: "Activity Date"
+    type: date_filter
+    default_value: 12 months
+
+  elements:
+
+  - name: contacted_cohort
+    type: table
+    base_view: candidates_activity
+    dimensions: [candidates.created_month, candidates_activity.activity_month]
+    pivots: [candidates_activity.activity_month]
+    measures: [candidates.count]
+    width: 12
+    height: 5
+    listen:
+      activity_type: candidates_activity_labels.label
+      cohort_month: candidates.created_month
+      activity_month: candidates_activity.activity_month
+    sorts: [candidates.created_month desc]
+    limit: 500
+
+  - name: cohort_area
+    type: looker_area
+    base_view: candidates_activity
+    dimensions: [candidates.created_month, candidates_activity.activity_month]
+    pivots: [candidates.created_month]
+    measures: [candidates.count]
+    listen:
+      activity_type: candidates_activity_labels.label
+      cohort_month: candidates.created_month
+      activity_month: candidates_activity.activity_month
+    sorts: [candidates_activity.activity_month desc]
+    limit: 500
+    width: 12
+    height: 5
+    show_null_points: true
+    show_null_labels: false
+    stacking: normal
+    x_axis_scale: time
+    point_style: circle
+    interpolation: linear
+
