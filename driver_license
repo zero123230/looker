@@ -1,0 +1,16 @@
+- view: driver_license
+  derived_table:
+    sql_trigger_value: SELECT FLOOR((UNIX_TIMESTAMP(CONVERT_TZ(NOW(),'UTC','America/Sao_Paulo')) - 60*60*5)/(60*60*24))
+    indexes: [uid]
+    sql: |
+      SELECT p.uid,
+        (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE NULL END FROM field_data_field_driver_license dla WHERE dla.entity_id = dl.entity_id AND dla.field_driver_license_value = 'A') AS a,
+        (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE NULL END FROM field_data_field_driver_license dlb WHERE dlb.entity_id = dl.entity_id AND dlb.field_driver_license_value = 'B') AS b,
+        (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE NULL END FROM field_data_field_driver_license dlc WHERE dlc.entity_id = dl.entity_id AND dlc.field_driver_license_value = 'C') AS c,
+        (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE NULL END FROM field_data_field_driver_license dld WHERE dld.entity_id = dl.entity_id AND dld.field_driver_license_value = 'D') AS d,
+        (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE NULL END FROM field_data_field_driver_license dle WHERE dle.entity_id = dl.entity_id AND dle.field_driver_license_value = 'E') AS e
+      FROM profile p 
+      INNER JOIN field_data_field_driver_license dl ON p.pid = dl.entity_id
+      GROUP BY uid
+      -- if dev -- LIMIT 1000
+
