@@ -1,0 +1,402 @@
+- view: jobs
+  derived_table:
+    sql_trigger_value: SELECT FLOOR((UNIX_TIMESTAMP(CONVERT_TZ(NOW(),'UTC','America/Sao_Paulo')) - 60*60*5)/(60*60*24))
+    indexes: [nid, created, name, position]
+    sql: |
+      SELECT n.nid
+        , empref.field_job_employer_ref_uid as uid
+        , n.title as position
+        , tdata.name
+        , n.created
+        , field_candidates_per_position_value
+        , field_job_gender_value
+        , field_job_archived_value
+        , field_automated_interviews_value
+        , field_job_education_value
+        , field_job_minimum_age_value
+        , field_job_maximum_age_value
+        , field_job_city_value
+        , field_job_suburb_value
+        , field_job_description_value
+        , addinfo.contract_type
+        , addinfo.shift_start_day
+        , addinfo.shift_finish_day
+        , addinfo.shift_start_hour
+        , addinfo.shift_finish_hour
+        , addinfo.shift_type
+        , addinfo.salary_minimum
+        , addinfo.salary_maximum
+        , addinfo.salary_base
+        , addinfo.salary_additional_type
+        , addinfo.salary_type
+        , addinfo.transport_benefit
+        , addinfo.meal_benefit
+        , addinfo.health_care_benefit
+        , addinfo.dental_care_benefit
+        , addinfo.daycare_benefit
+        , addinfo.training_benefit
+        , addinfo.allowance_benefit
+        , addinfo.life_insurance_benefit
+        , addinfo.discounts_benefit
+        , addinfo.career_plan_benefit
+        , addinfo.other_benefits
+        , addinfo.interview_contact
+        , field_job_zip_value
+        , field_job_experience_value
+        , jrev.status
+        , fdfrp.field_reference_point_value AS reference_point
+        , employer_jobs.paying_company AS paid_job
+        , alt_name.field_alternative_name_value AS alt_job_name
+        , short_desc.field_job_short_description_value AS short_description
+      FROM node n
+        LEFT JOIN field_data_field_job_employer_ref empref ON n.nid = empref.entity_id
+        LEFT JOIN field_data_field_position fpos ON n.nid = fpos.entity_id
+        LEFT JOIN taxonomy_term_hierarchy thier ON fpos.field_position_tid = thier.tid
+        LEFT JOIN field_data_field_candidates_per_position fperpos ON n.nid = fperpos.entity_id
+        LEFT JOIN field_data_field_job_gender fgen ON n.nid = fgen.entity_id
+        LEFT JOIN field_data_field_job_archived farc ON n.nid = farc.entity_id
+        LEFT JOIN field_data_field_automated_interviews fain ON n.nid = fain.entity_id
+        LEFT JOIN field_data_field_job_education fedu ON n.nid = fedu.entity_id
+        LEFT JOIN field_data_field_job_minimum_age fmin ON n.nid = fmin.entity_id
+        LEFT JOIN field_data_field_job_maximum_age fmax ON n.nid = fmax.entity_id
+        LEFT JOIN field_data_field_job_zip fzip ON n.nid = fzip.entity_id
+        LEFT JOIN field_data_field_job_experience fexp ON n.nid = fexp.entity_id
+        LEFT JOIN field_data_field_job_city fcity ON n.nid = fcity.entity_id
+        LEFT JOIN field_data_field_job_suburb fsuburb ON n.nid = fsuburb.entity_id
+        LEFT JOIN field_data_field_job_description fdescription ON n.nid = fdescription.entity_id
+        LEFT JOIN job_additional_info addinfo ON n.nid = addinfo.nid
+        LEFT JOIN taxonomy_term_data tdata ON thier.parent = tdata.tid
+        LEFT JOIN field_data_field_reference_point fdfrp ON fdfrp.entity_id = n.nid
+        LEFT JOIN jobs_review jrev ON n.nid = jrev.nid
+        LEFT JOIN employer_jobs ON n.nid = employer_jobs.nid
+        LEFT JOIN field_data_field_alternative_name alt_name ON n.nid = alt_name.entity_id
+        LEFT JOIN field_data_field_job_short_description short_desc ON n.nid = short_desc.entity_id
+      WHERE n.type = 'job'
+      GROUP BY n.nid
+      -- if dev -- LIMIT 1000
+
+  fields:
+
+  # DIMENSIONS #
+
+  - dimension: nid
+    primary_key: true
+    type: int
+    sql: ${TABLE}.nid
+    
+  - dimension: company_uid
+    type: int
+    hidden: true            # It's good practice to hide foreign keys in Looker.
+    sql: ${TABLE}.uid
+
+  - dimension: reference_point
+    sql: ${TABLE}.reference_point
+
+  - dimension: position
+    sql: ${TABLE}.position
+
+  - dimension: category
+    sql: ${TABLE}.name
+
+  - dimension_group: created
+    type: time
+    timeframes: [date, week, month, year]
+    sql: FROM_UNIXTIME(${TABLE}.created)
+
+  - dimension: candidates_requested
+    type: number
+    sql: ${TABLE}.field_candidates_per_position_value
+
+  - dimension: required_gender
+    sql: |
+      CASE
+        WHEN ${TABLE}.field_job_gender_value = 0 THEN 'masculino'
+        WHEN ${TABLE}.field_job_gender_value = 1 THEN 'feminino'
+        WHEN ${TABLE}.field_job_gender_value = 2 THEN 'ambos'
+      END
+
+  - dimension: is_archived
+    type: yesno
+    sql: ${TABLE}.field_job_archived_value = 1
+
+#   - dimension: automated_interviews
+#     type: number
+#     sql: ${TABLE}.field_automated_interviews_value
+
+  - dimension: minimum_education
+    sql: |
+      CASE
+        WHEN ${TABLE}.field_job_education_value = 0 THEN 'indiferente'
+        WHEN ${TABLE}.field_job_education_value = 1 THEN 'primario'
+        WHEN ${TABLE}.field_job_education_value = 2 THEN 'fundamental'
+        WHEN ${TABLE}.field_job_education_value = 3 THEN 'medio cursando'
+        WHEN ${TABLE}.field_job_education_value = 4 THEN 'medio completo'
+        WHEN ${TABLE}.field_job_education_value = 5 THEN 'superior cursando'
+        WHEN ${TABLE}.field_job_education_value = 6 THEN 'superior completo'
+      END
+      
+  - dimension: hidden_last_interview_date
+    type: number
+    hidden: true
+    sql: |
+      (SELECT MAX(field_date_value)
+      FROM field_data_field_interview_times times
+      LEFT JOIN field_data_field_date date ON times.field_interview_times_value = date.entity_id
+      WHERE times.entity_id = ${TABLE}.nid)
+
+  - dimension_group: last_interview_date
+    type: time
+    timeframes: [date, week, month, year, time]
+    sql: FROM_UNIXTIME(${hidden_last_interview_date})
+    
+  - dimension_group: billing_period
+    type: time
+    timeframes: [month, year]
+    convert_tz: false
+    sql: |
+      CASE
+        WHEN DAYOFMONTH(FROM_UNIXTIME(${hidden_last_interview_date})) < 26 THEN FROM_UNIXTIME(${hidden_last_interview_date})
+        ELSE DATE_ADD(FROM_UNIXTIME(${hidden_last_interview_date}), INTERVAL 1 month)
+      END  
+  
+  - dimension: hidden_first_interview_date
+    type: number
+    hidden: true
+    sql: |
+      (SELECT MIN(field_date_value)
+      FROM field_data_field_interview_times times
+      LEFT JOIN field_data_field_date date ON times.field_interview_times_value = date.entity_id
+      WHERE times.entity_id = ${TABLE}.nid)
+
+  - dimension_group: first_interview_date
+    type: time
+    timeframes: [date, week, month, year, time]
+    sql: FROM_UNIXTIME(${hidden_first_interview_date})
+    
+  - dimension: minimum_age
+    type: number
+    sql: ${TABLE}.field_job_minimum_age_value
+
+  - dimension: maximum_age
+    type: number
+    sql: ${TABLE}.field_job_maximum_age_value
+
+  - dimension: contract_type
+    sql: |
+      CASE
+        WHEN ${TABLE}.contract_type = 1 THEN 'CLT'
+        WHEN ${TABLE}.contract_type = 2 THEN 'Terceirizado'
+        WHEN ${TABLE}.contract_type = 3 THEN 'Autonomo'
+        WHEN ${TABLE}.contract_type = 4 THEN 'Estagio'
+      END
+
+  - dimension: shift_start_day
+    sql: ${TABLE}.shift_start_day
+
+  - dimension: shift_finish_day
+    sql: ${TABLE}.shift_finish_day
+
+  - dimension: shift_start_hour
+    sql: ${TABLE}.shift_start_hour
+
+  - dimension: shift_finish_hour
+    sql: ${TABLE}.shift_finish_hour
+
+  - dimension: shift_type
+    type: number
+    sql: ${TABLE}.shift_type
+
+  - dimension: salary_minimum
+    type: number
+    decimals: 2
+    sql: ${TABLE}.salary_minimum
+
+  - dimension: salary_maximum
+    type: number
+    decimals: 2
+    sql: ${TABLE}.salary_maximum
+
+  - dimension: salary_base
+    type: number
+    decimals: 2
+    sql: ${TABLE}.salary_base
+
+  - dimension: salary_additional_type
+    sql: |
+      CASE
+        WHEN  salary_additional_type = 1 THEN 'Comissao'
+        WHEN  salary_additional_type = 2 THEN 'Variavel'
+        WHEN  salary_additional_type = 3 THEN 'Premiacoes'
+        WHEN  salary_additional_type = 4 THEN 'Sem adicional'
+      END
+
+  - dimension: salary_type
+    sql: |
+      CASE
+        WHEN salary_type = 1 THEN 'Faixa'
+        WHEN salary_type = 2 THEN 'Base'
+        WHEN salary_type = 3 THEN 'A combinar'
+      END
+
+  - dimension: job_city
+    sql: ${TABLE}.field_job_city_value
+    
+  - dimension: job_suburb
+    sql: ${TABLE}.field_job_suburb_value
+    
+  - dimension: job_description
+    sql: ${TABLE}.field_job_description_value
+    
+  - dimension: is_transport_benefit
+    type: yesno
+    sql: ${TABLE}.transport_benefit = 1
+
+  - dimension: is_meal_benefit
+    type: yesno
+    sql: ${TABLE}.meal_benefit = 1
+
+  - dimension: is_health_care_benefit
+    type: yesno
+    sql: ${TABLE}.health_care_benefit = 1
+
+  - dimension: is_dental_care_benefit
+    type: yesno
+    sql: ${TABLE}.dental_care_benefit = 1
+
+  - dimension: is_daycare_benefit
+    type: yesno
+    sql: ${TABLE}.daycare_benefit = 1
+
+  - dimension: is_training_benefit
+    type: yesno
+    sql: ${TABLE}.training_benefit = 1
+
+  - dimension: is_allowance_benefit
+    type: yesno
+    sql: ${TABLE}.allowance_benefit = 1
+
+  - dimension: is_life_insurance_benefit
+    type: yesno
+    sql: ${TABLE}.life_insurance_benefit = 1
+
+  - dimension: is_discounts_benefit
+    type: yesno
+    sql: ${TABLE}.discounts_benefit = 1
+
+  - dimension: is_career_plan_benefit
+    type: yesno
+    sql: ${TABLE}.career_plan_benefit = 1
+
+  - dimension: other_benefits
+    type: number
+    sql: ${TABLE}.other_benefits
+
+  - dimension: interview_contact
+    sql: ${TABLE}.interview_contact
+
+  - dimension: zip
+    sql: ${TABLE}.field_job_zip_value
+
+  - dimension: region
+    sql: |
+      CASE
+        WHEN ${zip} between 01000000 and 01999999 THEN 'Centro'
+        WHEN ${zip} between 02000000 and 02999999 THEN 'Zona Norte'
+        WHEN ${zip} between 03000000 and 03999999 THEN 'Zona Leste'
+        WHEN ${zip} between 04000000 and 04999999 THEN 'Zona Sul'
+        WHEN ${zip} between 05000000 and 05999999 THEN 'Zona Oeste'
+        WHEN ${zip} between 06000000 and 06999999 THEN 'Grande Oeste'
+        WHEN ${zip} between 07000000 and 07999999 THEN 'Grande Norte'
+        WHEN ${zip} between 08000000 and 08999999 THEN 'Grande Leste'
+        WHEN ${zip} between 09000000 and 09999999 THEN 'Grande Sul'
+        WHEN ${zip} between 10000000 and 99999999 THEN 'Outros'
+      END
+
+  - dimension: job_experience
+    sql: ${TABLE}.field_job_experience_value
+    
+  - dimension: status
+    sql: |
+      CASE
+        WHEN ${TABLE}.status = 0 THEN 'holding'
+        WHEN ${TABLE}.status = 1 THEN 'approved'
+        WHEN ${TABLE}.status = 2 THEN 'rejected'
+        WHEN ${TABLE}.status = 3 THEN 'closed by user'
+      END
+  
+  - dimension: paid_job
+    type: yesno
+    sql: ${TABLE}.paid_job = 1
+
+  - dimension: alt_job_name
+    sql: ${TABLE}.alt_job_name
+    
+  - dimension: has_alt_job_name
+    type: yesno
+    sql: ${TABLE}.alt_job_name IS NOT NULL AND ${TABLE}.alt_job_name <> ''  
+
+  - dimension: short_description
+    sql: ${TABLE}.short_description
+    
+  - dimension: has_short_description
+    type: yesno
+    sql: ${TABLE}.short_description IS NOT NULL AND ${TABLE}.short_description <> '' 
+
+
+#  - dimension: position_contacted_interviewed_percent_conversion
+#    type: number
+#    sql: ${job_aggregate_info.candidates_attended_sum}/NULLIF(${job_aggregate_info.candidates_contacted_sum},0)
+
+  # MEASURES #
+  
+  - measure: count
+    type: count
+    detail: detail*
+
+  - measure: candidates_requested_sum
+    type: sum
+    sql: ${candidates_requested}
+    detail: detail*
+
+  # SETS #
+
+  sets:
+    detail:
+      - nid
+      - title
+      - name
+      - created
+      - field_company_name_value
+      - field_candidates_per_position_value
+      - field_job_gender_value
+      - field_job_archived_value
+      - field_automated_interviews_value
+      - field_job_education_value
+      - field_job_minimum_age_value
+      - field_job_maximum_age_value
+      - contract_type
+      - shift_start_day
+      - shift_finish_day
+      - shift_start_hour
+      - shift_finish_hour
+      - shift_type
+      - salary_minimum
+      - salary_maximum
+      - salary_base
+      - salary_additional_type
+      - salary_type
+      - transport_benefit
+      - meal_benefit
+      - health_care_benefit
+      - dental_care_benefit
+      - daycare_benefit
+      - training_benefit
+      - allowance_benefit
+      - life_insurance_benefit
+      - discounts_benefit
+      - career_plan_benefit
+      - other_benefits
+      - interview_contact
+      - field_job_zip_value
+      - field_job_experience_value
+
