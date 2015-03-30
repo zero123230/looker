@@ -1,0 +1,61 @@
+- view: sms_threads
+  fields:
+
+  - dimension: id
+    primary_key: true
+    type: int
+    sql: ${TABLE}.id
+
+  - dimension: batch_id
+    type: int
+    hidden: true
+    sql: ${TABLE}.batch_id
+
+  - dimension: created
+    type: int
+    sql: ${TABLE}.created
+
+  - dimension: flow
+    sql: ${TABLE}.flow
+
+  - dimension: integrator
+    sql: ${TABLE}.integrator
+
+  - dimension: last_activity
+    type: int
+    sql: ${TABLE}.last_activity
+
+  - dimension: nid
+    type: int
+    sql: ${TABLE}.nid
+
+  - dimension: phone
+    type: number
+    sql: ${TABLE}.phone
+
+  - dimension: sms_id
+    type: int
+    sql: ${TABLE}.sms_id
+
+  - dimension: sms_system_name
+    sql: ${TABLE}.sms_system_name
+
+  - dimension: type
+    sql: ${TABLE}.type
+
+  - dimension: uid
+    type: int
+    sql: ${TABLE}.uid
+
+  - measure: count
+    type: count
+    detail: detail*
+
+
+  # ----- Detail ------
+  sets:
+    detail:
+      - id
+      - sms_system_name
+
+
