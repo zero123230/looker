@@ -1,0 +1,38 @@
+- view: ranked_matches
+
+  derived_table:
+    sql_trigger_value: SELECT FLOOR((UNIX_TIMESTAMP(CONVERT_TZ(NOW(),'UTC','America/Sao_Paulo')) - 60*60*5)/(60*60*24))
+    indexes: [nid]
+    sql: |
+      SELECT nid, uid, score, 
+        @rank := IF(@current_nid = nid, @rank + 1, 1) AS rank,
+        @current_nid := nid
+      FROM employees_matches_storage
+      ORDER BY nid, score DESC
+
+  fields:
+
+    - dimension: uid
+      type: int
+      sql: ${TABLE}.uid
+      
+    - dimension: nid
+      type: int
+      sql: ${TABLE}.nid
+      
+    - dimension: rank
+      type: int
+      sql: ${TABLE}.rank
+      
+    - dimension: score
+      type: number
+      decimals: 2
+      sql: ${TABLE}.score
+    
+    - dimension: rank_tier
+      type: tier
+      tiers: [0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+      style: integer
+      sql: ${rank}
+      
+
