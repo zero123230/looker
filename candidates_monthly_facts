@@ -1,0 +1,199 @@
+- base_view: candidates_monthly_facts
+
+- view: candidates_monthly_facts
+  derived_table:
+    indexes: [cohort]
+    sql_trigger_value: SELECT FLOOR((UNIX_TIMESTAMP(CONVERT_TZ(NOW(),'UTC','America/Sao_Paulo')) - 60*60*5)/(60*60*24))
+    sql: |
+      SELECT
+        DATE_FORMAT(FROM_UNIXTIME(c.date_created),'%Y-%m') AS cohort
+        , COUNT(*) AS cohort_size
+        , SUM(
+            CASE
+              WHEN caf.first_contacted IS NOT NULL
+              THEN 1
+              ELSE NULL
+            END
+        ) AS contacted_size
+        , SUM(caf.lifetime_contacted) AS contacted_amount
+        , SUM(
+            CASE
+              WHEN caf.first_interested IS NOT NULL
+              THEN 1
+              ELSE NULL
+            END
+        ) AS interested_size
+        , SUM(caf.lifetime_interested) AS interested_amount
+        , SUM(
+            CASE
+              WHEN caf.first_scheduled_for_interview IS NOT NULL
+              THEN 1
+              ELSE NULL
+            END
+        ) AS scheduled_for_interview_size
+        , SUM(caf.lifetime_scheduled_for_interview) AS scheduled_for_interview_amount
+        , SUM(
+            CASE
+              WHEN caf.first_confirmed_interview IS NOT NULL
+              THEN 1
+              ELSE NULL
+            END
+        ) AS confirmed_interview_size
+        , SUM(caf.lifetime_confirmed_interviews) AS confirmed_interviews_amount
+        , SUM(
+            CASE
+              WHEN caf.first_attended_interview IS NOT NULL
+              THEN 1
+              ELSE NULL
+            END
+        ) AS attended_interview_size
+        , SUM(caf.lifetime_attended_interview) AS attended_interview_amount
+        , SUM(
+            CASE
+              WHEN caf.first_pre_interview_hired IS NOT NULL
+              THEN 1
+              ELSE NULL
+            END
+        ) AS pre_interview_hired_size
+        , SUM(caf.lifetime_pre_interview_hired) AS pre_interview_hired_amount
+        , SUM(
+            CASE
+              WHEN caf.first_hired IS NOT NULL
+              THEN 1
+              ELSE NULL
+            END
+        ) AS hired_size
+        , SUM(caf.first_hired) AS hired_amount
+      FROM ${candidates.SQL_TABLE_NAME} AS c
+      LEFT JOIN ${candidate_activity_facts.SQL_TABLE_NAME} AS caf
+      ON caf.uid = c.uid
+      WHERE c.complete = 1
+      GROUP BY 1
+
+  fields:
+    - dimension_group: cohort_month
+      primary_key: true
+#       hidden: true
+      sql: ${TABLE}.cohort
+    
+    - dimension: cohort_size
+      type: int
+    
+    - dimension: contacted_size
+      type: int
+      hidden: true
+    
+    - dimension: contacted_amount
+      hidden: true
+    
+    - dimension: percent_contacted
+      type: number
+      decimals: 2
+      sql: 100.0 * ${contacted_size}/NULLIF(${cohort_size},0)
+    
+    - dimension: contacts_per_contacted_candidate
+      type: number
+      decimals: 2
+      sql: 1.0 * ${contacted_amount}/${contacted_size}
+
+    - dimension: interested_size
+      type: int
+      hidden: true
+    
+    - dimension: interested_amount
+      hidden: true
+    
+    - dimension: percent_interested
+      type: number
+      decimals: 2
+      sql: 100.0 * ${interested_size}/NULLIF(${cohort_size},0)
+    
+    - dimension: interests_per_interested_candidate
+      type: number
+      decimals: 2
+      sql: 1.0 * ${interested_amount}/${interested_size}
+
+    - dimension: scheduled_for_interview_size
+      type: int
+      hidden: true
+    
+    - dimension: scheduled_for_interview_amount
+      hidden: true
+    
+    - dimension: percent_scheduled_for_interview
+      type: number
+      decimals: 2
+      sql: 100.0 * ${scheduled_for_interview_size}/NULLIF(${cohort_size},0)
+    
+    - dimension: interviews_scheduled_per_scheduled_candidate
+      type: number
+      decimals: 2
+      sql: 1.0 * ${scheduled_for_interview_amount}/${scheduled_for_interview_size}
+
+    - dimension: confirmed_interview_size
+      type: int
+      hidden: true
+    
+    - dimension: confirmed_interviews_amount
+      hidden: true
+    
+    - dimension: percent_confirmed_interviews
+      type: number
+      decimals: 2
+      sql: 100.0 * ${confirmed_interview_size}/NULLIF(${cohort_size},0)
+    
+    - dimension: confirmed_interviews_per_confirming_candidate
+      type: number
+      decimals: 2
+      sql: 1.0 * ${confirmed_interviews_amount}/${confirmed_interview_size}
+
+    - dimension: attended_interview_size
+      type: int
+      hidden: true
+    
+    - dimension: attended_interview_amount
+      hidden: true
+    
+    - dimension: percent_attended_interview
+      type: number
+      decimals: 2
+      sql: 100.0 * ${attended_interview_size}/NULLIF(${cohort_size},0)
+    
+    - dimension: interviews_per_attended_candidate
+      type: number
+      decimals: 2
+      sql: 1.0 * ${attended_interview_amount}/${attended_interview_size}
+
+    - dimension: pre_interview_hired_size
+      type: int
+      hidden: true
+    
+    - dimension: pre_interview_hired_amount
+      hidden: true
+    
+    - dimension: percent_pre_interview_hired
+      type: number
+      decimals: 2
+      sql: 100.0 * ${pre_interview_hired_size}/NULLIF(${cohort_size},0)
+    
+    - dimension: pre_interview_hires_per_pre_interview_hired_candidate
+      type: number
+      decimals: 2
+      sql: 1.0 * ${pre_interview_hired_amount}/${pre_interview_hired_size}
+
+    - dimension: hired_size
+      type: int
+      hidden: true
+    
+    - dimension: hired_amount
+      hidden: true
+    
+    - dimension: percent_hired
+      type: number
+      decimals: 2
+      sql: 100.0 * ${hired_size}/NULLIF(${cohort_size},0)
+    
+    - dimension: hires_per_hired_candidate
+      type: number
+      decimals: 2
+      sql: 1.0 * ${hired_amount}/${hired_size}
