@@ -1,0 +1,51 @@
+- view: job_sms_facts
+  derived_table:
+    sql_trigger_value: SELECT FLOOR((UNIX_TIMESTAMP(CONVERT_TZ(NOW(),'UTC','America/Sao_Paulo')) - 60*60*5)/(60*60*24))
+    indexes: [nid]
+    sql: |
+      select nid, sum(total) as total from (
+        select count(*) as total, nid from sms_threads_storage sts 
+        inner join sms_messages sm on sts.sms_id = sm.sms_id
+        where sts.type = 'job'
+        group by nid
+        union
+        select count(*) as total, nid from employees_activity
+        where activity_id = 12
+        group by nid
+        union
+        select count(*) as total, nid from employees_reschedulings
+        where interview_has_passed = 1
+        group by nid
+        union
+        select count(*) as total, nid from employees_interviews
+        where reminder_sent_same_day > 1
+        group by nid
+        union
+        select count(*) as total, nid from employees_interviews
+        where reminder_sent_one_day_before_2 > 1
+        group by nid
+        union
+        select count(*) as total, nid from employees_interviews
+        where reminder_sent_one_day_before_1 > 1
+        group by nid
+        union
+        select count(*) as total, nid from employees_interviews
+        where reminder_sent_two_days_before > 1
+        group by nid) as job_sms_facts
+      group by nid
+
+      
+  fields:
+
+    - dimension: nid
+      type: int
+      sql: ${TABLE}.nid
+
+    - measure: sms_messages_sum
+      type: sum
+      sql: ${TABLE}.total
+      
+    - measure: sms_cost
+      type: number
+      sql: ${sms_messages_sum}*0.055
+
