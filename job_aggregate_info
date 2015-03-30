@@ -1,0 +1,169 @@
+- view: job_aggregate_info
+  derived_table:
+    sql_trigger_value: SELECT FLOOR((UNIX_TIMESTAMP(CONVERT_TZ(NOW(),'UTC','America/Sao_Paulo')) - 60*60*5)/(60*60*24))
+    indexes: [nid]
+    sql: |
+      SELECT n.nid as nid,
+        (SELECT COUNT(DISTINCT ea_contacted.uid) FROM employees_activity ea_contacted WHERE ea_contacted.activity_id = 1 AND ea_contacted.nid = n.nid) AS candidates_contacted,
+        (SELECT COUNT(DISTINCT ea_interested.uid) FROM employees_activity ea_interested WHERE ea_interested.activity_id = 2 AND ea_interested.nid = n.nid) AS candidates_requested_interview_times,
+        (SELECT COUNT(DISTINCT ea_more_info.uid) FROM employees_activity ea_more_info WHERE ea_more_info.activity_id = 9 AND ea_more_info.nid = n.nid) AS candidates_requested_salary_info,
+        (SELECT COUNT(DISTINCT ea_job_description.uid) FROM employees_activity ea_job_description WHERE ea_job_description.activity_id = 16 AND ea_job_description.nid = n.nid) AS candidates_requested_job_description,
+        (SELECT COUNT(DISTINCT ea_scheduled.uid) FROM employees_activity ea_scheduled WHERE ea_scheduled.activity_id = 3 AND ea_scheduled.nid = n.nid) AS candidates_scheduled_interview,
+        (SELECT COUNT(DISTINCT ea_cancelled.uid) FROM employees_activity ea_cancelled WHERE ea_cancelled.activity_id IN (11, 12, 14) AND ea_cancelled.nid = n.nid) AS interview_cancelled,
+        (SELECT COUNT(DISTINCT ei.uid) FROM employees_interviews ei WHERE ei.confirmed = 1 AND ei.nid = n.nid) AS candidates_confirmed_interview,
+        (SELECT COUNT(DISTINCT eia.uid) FROM employees_internal_activity eia WHERE eia.activity_id IN (1, 10) AND eia.nid = n.nid) AS candidates_attended,
+        (SELECT COUNT(DISTINCT eia.uid) FROM employees_internal_activity eia WHERE eia.activity_id = 10 AND eia.nid = n.nid) AS candidates_hired,
+        (SELECT COUNT(DISTINCT eia_missed_interview.uid) FROM employees_internal_activity eia_missed_interview WHERE eia_missed_interview.activity_id IN (3, 4, 5, 6, 7, 8, 9) AND eia_missed_interview.nid = n.nid) AS candidates_missed_interview,
+        (SELECT COUNT(DISTINCT eia_no_answer.uid) FROM employees_internal_activity eia_no_answer WHERE eia_no_answer.activity_id = 2 AND eia_no_answer.nid = n.nid) AS candidates_no_answer,
+        (SELECT COUNT(DISTINCT eia_no_status.uid) FROM employees_internal_activity eia_no_status WHERE eia_no_status.activity_id = 0 AND eia_no_status.nid = n.nid) AS candidates_no_status,
+        (SELECT COUNT(DISTINCT pir_yes.uid) FROM post_interview_responses pir_yes WHERE pir_yes.first_response = 1 AND pir_yes.nid = n.nid) AS post_interview_attended,
+        (SELECT COUNT(DISTINCT pir_no.uid) FROM post_interview_responses pir_no WHERE pir_no.first_response = 0 AND pir_no.nid = n.nid) AS post_interview_not_attended,
+        (SELECT (SUM(CASE WHEN sm.state = 'send' THEN 1 ELSE 0 END) - SUM(CASE WHEN sm.state = 'receive' THEN 1 ELSE 0 END)) FROM sms_threads_storage sts INNER JOIN sms_messages sm ON sts.sms_id = sm.sms_id WHERE sts.sms_system_name = 'job_notification_round_5' AND sts.nid = n.nid) AS post_interview_not_responded
+      FROM node n
+      WHERE n.type = 'job'
+      GROUP BY n.nid
+      -- if dev -- LIMIT 1000
+
+  fields:
+
+  - dimension: nid
+    primary_key: true
+    type: int
+    sql: ${TABLE}.nid
+    
+  - dimension: candidates_contacted
+    type: int
+    sql: ${TABLE}.candidates_contacted
+    
+  - dimension: candidates_requested_interview_times
+    type: int
+    sql: ${TABLE}.candidates_requested_interview_times
+    
+  - dimension: candidates_requested_salary_info
+    type: int
+    sql: ${TABLE}.candidates_requested_salary_info
+    
+  - dimension: candidates_requested_job_description
+    type: int
+    sql: ${TABLE}.candidates_requested_job_description
+  
+  - dimension: candidates_scheduled_interview
+    type: int
+    sql: ${TABLE}.candidates_scheduled_interview
+  
+  - dimension: interview_cancelled
+    type: int
+    sql: ${TABLE}.interview_cancelled
+  
+  - dimension: candidates_confirmed_interview
+    type: int
+    sql: ${TABLE}.candidates_confirmed_interview
+    
+  - dimension: candidates_attended
+    type: int
+    sql: ${TABLE}.candidates_attended
+    
+  - dimension: candidates_hired
+    type: int
+    sql: ${TABLE}.candidates_hired
+  
+  - dimension: candidates_missed_interview
+    type: int
+    sql: ${TABLE}.candidates_missed_interview
+    
+  - dimension: candidates_no_answer
+    type: int
+    sql: ${TABLE}.candidates_no_answer
+    
+  - dimension: candidates_no_status
+    type: int
+    sql: ${TABLE}.candidates_no_status
+    
+  - dimension: post_interview_attended
+    type: int
+    sql: ${TABLE}.post_interview_attended
+    
+  - dimension: post_interview_not_attended
+    type: int
+    sql: ${TABLE}.post_interview_not_attended
+    
+  - dimension: post_interview_not_responded
+    type: int
+    sql: ${TABLE}.post_interview_not_responded
+    
+  # MEASURES #
+    
+  - measure: candidates_contacted_sum
+    type: sum
+    sql: ${candidates_contacted}
+    
+  - measure: candidates_requested_interview_times_sum
+    type: sum
+    sql: ${candidates_requested_interview_times}
+    
+  - measure: candidates_requested_salary_info_sum
+    type: sum
+    sql: ${candidates_requested_salary_info}
+    
+  - measure: candidates_requested_job_description_sum
+    type: sum
+    sql: ${candidates_requested_job_description}
+  
+  - measure: candidates_scheduled_interview_sum
+    type: sum
+    sql: ${candidates_scheduled_interview}
+  
+  - measure: candidates_confirmed_interview_sum
+    type: sum
+    sql: ${candidates_confirmed_interview}
+
+  - measure: interview_cancelled_sum
+    type: sum
+    sql: ${interview_cancelled}
+  
+  - measure: candidates_attended_sum
+    type: sum
+    sql: ${candidates_attended}
+    
+  - measure: candidates_hired_sum
+    type: sum
+    sql: ${candidates_hired}
+  
+  - measure: candidates_missed_interview_sum
+    type: sum
+    sql: ${candidates_missed_interview}
+    
+  - measure: candidates_no_answer_sum
+    type: sum
+    sql: ${candidates_no_answer}
+    
+  - measure: candidates_no_status_sum
+    type: sum
+    sql: ${candidates_no_status}
+    
+  - measure: internal_post_interview_activity_sum
+    type: int
+    sql: ${candidates_attended_sum}+${candidates_missed_interview_sum}+${candidates_no_answer_sum}
+  
+  - measure: post_interview_attended_sum
+    type: sum
+    sql: ${post_interview_attended}
+    
+  - measure: post_interview_not_attended_sum
+    type: sum
+    sql: ${post_interview_not_attended}
+    
+  - measure: post_interview_not_responded_sum
+    type: sum
+    sql: ${post_interview_not_responded}
+    
+  - measure: contacted_to_interview_confirmed_percentage
+    type: number
+    decimals: 3
+    sql: ${candidates_confirmed_interview_sum}/NULLIF(${candidates_contacted_sum},0)
+
+  - measure: interview_confirmed_to_attended_percentage
+    type: number
+    decimals: 3
+    sql: ${candidates_attended_sum}/NULLIF(${candidates_confirmed_interview_sum},0) # In future add filters: jobs.paid_job: 'Yes'
+
