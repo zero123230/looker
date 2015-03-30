@@ -1,0 +1,50 @@
+- view: candidates_activity_conversion
+  derived_table:
+    sql_trigger_value: SELECT FLOOR((UNIX_TIMESTAMP(CONVERT_TZ(NOW(),'UTC','America/Sao_Paulo')) - 60*60*5)/(60*60*24))
+    indexes: [date, nid, uid]
+    sql: |
+      SELECT
+        a1.id AS id
+        , 'contacted' AS type
+        , a1.date AS date
+        , a1.uid AS uid
+        , a1.nid AS nid
+        , a1.activity_id AS activity_id
+      FROM employees_activity AS a1
+      WHERE a1.activity_id = 1
+      UNION
+      SELECT
+        a2.id AS id
+        , 'attended_interview' AS type
+        , a2.date AS date
+        , a2.uid AS uid
+        , a2.nid AS nid
+        , a2.activity_id AS activity_id
+      FROM employees_internal_activity AS a2
+      WHERE a2.activity_id = 1
+
+  fields:
+    - dimension: type
+      sql: ${TABLE}.type
+      hidden: true
+    
+    - dimension: nid
+      sql: ${TABLE}.nid
+    
+    - dimension: uid
+      sql: ${TABLE}.uid
+      
+    - measure: contacted_count
+      type: count
+      filters:
+        type: 'contacted'
+    
+    - measure: interviewed_count
+      type: count
+      filters:
+        type: 'attended_interview'
+    
+    - measure: contacted_interviewd_percent_conversion
+      type: number
+      decimals: 3
+      sql: 100.0 * ${interviewed_count}/NULLIF(${contacted_count},0)
