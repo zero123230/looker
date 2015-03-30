@@ -1,0 +1,80 @@
+- view: all_positions_candidates
+  derived_table:
+    sql_trigger_value: SELECT FLOOR((UNIX_TIMESTAMP(CONVERT_TZ(NOW(),'UTC','America/Sao_Paulo')) - 60*60*5)/(60*60*24))
+    indexes: [uid, category, position]
+    sql: |
+      SELECT ui.uid,
+        ui.category_1 AS category,
+        ui.position_1 AS position, 
+        ui.experience_1 AS experience,
+        field_desired_cat1_tid AS category_id,
+        field_desired_job1_tid AS position_id
+      FROM user_info ui
+      INNER JOIN profile p ON ui.uid = p.uid
+      LEFT JOIN field_data_field_desired_cat1 c ON c.entity_id = p.pid
+      LEFT JOIN field_data_field_desired_job1 j ON j.entity_id = p.pid
+      -- if dev -- LIMIT 1000
+      
+      UNION ALL
+      
+      SELECT ui.uid,
+        ui.category_2 AS category,
+        ui.position_2 AS position, 
+        ui.experience_2 AS experience,
+        field_desired_cat2_tid AS category_id,
+        field_desired_job2_tid AS position_id
+      FROM user_info ui
+      INNER JOIN profile p ON ui.uid = p.uid
+      LEFT JOIN field_data_field_desired_cat2 c ON c.entity_id = p.pid
+      LEFT JOIN field_data_field_desired_job2 j ON j.entity_id = p.pid
+      -- if dev -- LIMIT 1000
+      
+      UNION ALL
+      
+      SELECT ui.uid,
+        ui.category_3 AS category,
+        ui.position_3 AS position, 
+        ui.experience_3 AS experience,
+        field_desired_cat3_tid AS category_id,
+        field_desired_job3_tid AS position_id
+      FROM user_info ui
+      INNER JOIN profile p ON ui.uid = p.uid
+      LEFT JOIN field_data_field_desired_cat3 c ON c.entity_id = p.pid
+      LEFT JOIN field_data_field_desired_job3 j ON j.entity_id = p.pid
+      -- if dev -- LIMIT 1000
+      
+  fields:
+
+  - dimension: uid
+    type: int
+    sql: ${TABLE}.uid
+    
+  - dimension: category
+    sql: ${TABLE}.category
+    
+  - dimension: position
+    sql: ${TABLE}.position
+    
+  - dimension: category_id
+    sql: ${TABLE}.category_id
+    
+  - dimension: position_id
+    sql: ${TABLE}.position_id
+    
+  - dimension: experience
+    type: number
+    sql: ${TABLE}.experience
+    
+  # MEASURES
+    
+  - measure: count
+    type: count
+    
+  - measure: percent_of_total_count
+    type: percent_of_total
+    sql: ${count}
+    
+  - measure: count_distinct
+    type: count_distinct
+    sql: ${TABLE}.uid
+    
